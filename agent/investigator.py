@@ -155,13 +155,21 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             lang_note = " Reply language: Korean (polite 존댓말)." if lang == "ko" else ""
             user_payload = _mask(json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(),
                                              "rows": _redact(journey, email), "investigation": loop_finding}, default=str), email)
-            resp = client.chat.completions.create(model=model, temperature=0.2, max_tokens=4000, reasoning_effort=os.getenv("LLM_REASONING", "none"),
-                messages=[{"role": "system", "content": SYSTEM + lang_note},
-                          {"role": "user", "content": user_payload}])
             from .agent_loop import _parse
-            texts = _parse(resp.choices[0].message.content or "")
-            if not texts:
-                raise ValueError("model returned no JSON object")
+            for attempt in (1, 2):  # the hosted endpoint sometimes times out or returns no JSON; one retry
+                try:
+                    resp = client.chat.completions.create(model=model, temperature=0.2, max_tokens=4000, reasoning_effort=os.getenv("LLM_REASONING", "none"),
+                        messages=[{"role": "system", "content": SYSTEM + lang_note},
+                                  {"role": "user", "content": user_payload}])
+                    texts = _parse(resp.choices[0].message.content or "")
+                    if not texts:
+                        raise ValueError("model returned no JSON object")
+                    break
+                except Exception as e:
+                    texts = None
+                    if attempt == 2:
+                        raise
+                    mark("llm_explain_retry", f"{type(e).__name__}"[:80])
             llm_used = getattr(resp, "model", None) or model
             from .agent_loop import meterless_receipt
             receipts.append(meterless_receipt(resp))
@@ -176,10 +184,11 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             mark("llm_explain", f"{model} citations_ok={ok}")
         except Exception as e:  # keep the demo honest: show that the model step failed
             mark("llm_explain", f"failed: {type(e).__name__}: {e}"[:200])
+            llm_used = "failed"
     if texts is None:
         texts = {"explanation": verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs),
                  "customer_reply": _template_reply(verdict, lang), "fix_action": verdict.suggested_fix}
-        mark("template_texts", "no LLM endpoint configured — verifier text used")
+        mark("template_texts", "model call failed — verifier text used" if llm_used == "failed" else "no LLM endpoint configured — verifier text used")
 
     return {"ok": True, "order_id": target["order_id"], "email": target["email"], "headline": verdict.headline,
             "chain": [{"name": l.name, "label": LABELS[l.name], "state": l.state, "note": l.note, "refs": l.refs} for l in verdict.links],

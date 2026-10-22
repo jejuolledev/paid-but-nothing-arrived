@@ -134,6 +134,7 @@ const I18N={
     ms:'ms',
     answeredBy:m=>'Answered by: '+m+' on this machine',
     templateExplain:'Explanation: template (no model connected)',
+    failedExplain:'Explanation: verifier text (model call failed twice)',
     dataZetaris:'Data: Zetaris',
     dataLocal:'Data: local files',
     approveFix:'Approve fix',
@@ -189,6 +190,7 @@ const I18N={
     ms:'ms',
     answeredBy:m=>'답변: '+m+' (이 기기)',
     templateExplain:'설명: 템플릿(연결된 모델 없음)',
+    failedExplain:'설명: 검증기 문장(모델 호출 두 번 실패)',
     dataZetaris:'데이터: Zetaris',
     dataLocal:'데이터: 로컬 파일',
     approveFix:'수정 승인',
@@ -296,7 +298,8 @@ function statusLine(r){
   const data=be?( /zetaris/i.test(be)?i.dataZetaris:i.dataLocal):'';
   if(!r.ok)return data;
   const parts=[];
-  if(r.llm==='none'||!r.llm)parts.push(i.templateExplain);
+  if(r.llm==='failed')parts.push(i.failedExplain);
+  else if(r.llm==='none'||!r.llm)parts.push(i.templateExplain);
   else parts.push(i.answeredBy(r.llm));
   if(data)parts.push(data);
   if(r.elapsed_ms!=null)parts.push(r.elapsed_ms+' '+i.ms);
