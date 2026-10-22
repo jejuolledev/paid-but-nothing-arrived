@@ -1,0 +1,10 @@
+---
+description: Paid-but-nothing-arrived agent — project rules
+alwaysApply: true
+---
+- The agent must never state a fact without citing a raw row `ref` returned by the SQL tools.
+- All data access goes through `agent/sql_backend.py` (Zetaris in production, DuckDB over the synthetic CSVs for tests). No direct DB/API calls elsewhere.
+- The deterministic verifier in `agent/chain.py` decides the verdict; the language model only explains and drafts.
+- Fix actions are suggestions that require human approval; never execute them automatically.
+- Synthetic data only. Emails end with @example.com; card last4 are public test numbers.
+- Plain English in UI text; no marketing adjectives.
