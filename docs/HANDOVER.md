@@ -14,7 +14,12 @@
 - 지금은 Zetaris 없이 DuckDB(`agent/sql_backend.py`)로, LLM 없이 verifier 문장으로 돈다. 화면·결과에 `backend`·`llm`이 그대로 찍힘(속이지 않음).
 
 ## 1. 후원사 필수 연동 — 진행 상황
-### Zetaris (필수)
+### Zetaris (필수) — ✅ 10/22 10:40 연동 완료
+- 로컬 스택 가동 중(`docker compose ps` 전부 healthy, bootstrap만 one-shot), JDBC `SELECT 1` 4.8s. 합성 CSV 5개를 번들 Postgres `demo` DB에 적재(`zetaris/load_postgres.sh`), `zetaris/register.sql`로 데이터소스 `demo_pg` + 네임스페이스 `lightning.metastore.demo` + USL `order_journey` 등록·활성화 완료(`zetaris/run_sql.py`). 조인 스모크 쿼리 OK.
+- 에이전트 5사례 pytest **zetaris-jdbc 백엔드로 5/5 통과**(1사례 약 9초 — 에뮬레이션 Spark). `.env.local` 작성됨(비밀번호는 번들 `.env`에서; 커밋 제외).
+- Lightning DDL이 거부한 것: 설명문에 공백/콜론, 열 이름 `to`(백틱도 안 됨)·`tag` → `to_address`·`order_tag`로 전부 개명(생성기·CSV·Postgres·tools·DuckDB 뷰). `SHOW NAMESPACES`는 비활성(`SHOW NAMESPACES IN …` 아님, 그냥 못 씀).
+- 맥 재부팅되면 `colima start`(설정 유지) → `cd hackathons/zetaris-platform && docker compose up -d && ./verify.sh` → USL·데이터는 볼륨에 남아 있음(사라지면 load_postgres.sh·run_sql.py 다시).
+- (아래는 연동 전 메모)
 - 공용 서버 없음 → **로컬 Docker판**. Zetaris Cloud 계정 로그인 완료(jejuolleapps, OTP는 Gmail /u/1). 대시보드 「Run locally」 안내 그대로 진행.
 - 번들: `/Users/ollekil/Desktop/Moahub-Labs/hackathons/zetaris-platform/` (zip은 같은 폴더). `./preflight.sh` 전부 PASS(docker=colima vz+rosetta, compose 플러그인 설치함, 레지스트리 `zetarishackathon.azurecr.io` 로그인 완료 — 로그인 명령은 개인용, 저장소·문서에 적지 않음. 스크래치 `zetaris_login_cmd.txt`에만).
 - `docker compose pull` 백그라운드 진행 중(약 4GB, 로그 scratchpad/zetaris_pull.log). 끝나면: `docker compose up -d` → `./verify.sh` → UI http://localhost:3000 (admin@zetaris.com / 초기 비밀번호는 대시보드 7단계에 표시, 첫 로그인 후 바꿀 것) → JDBC `jdbc:zetaris:lightning@localhost:10000`, 드라이버 `jdbc/ndp-jdbc-driver-2.4.3.1-7eff043-driver.jar`, 클래스 `com.zetaris.lightning.jdbc.LightningDriver`, Java는 `/opt/homebrew/opt/openjdk@21`.
