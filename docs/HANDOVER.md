@@ -2,7 +2,13 @@
 
 이 파일은 다음 세션(Opus/Fable 누구든)이 바로 이어 하기 위한 것. 영어 제출물(README·슬라이드·영상 자막)은 이 저장소 안에, 한국어 메모는 여기에만.
 
-## 0. 지금 상태 (10/22 10:15 KST)
+## 0. 지금 상태 (10/22 10:50 KST 갱신)
+- GitHub 비공개 저장소 생성·푸시됨: https://github.com/jejuolledev/paid-but-nothing-arrived (제출 전에 `gh repo edit --visibility public --accept-visibility-change-consequences`).
+- 데모 초안: `scripts/record_demo.mjs`(Playwright headless, 1280×720, 자막 배너 주입) → `docs/demo/walkthrough_draft.mp4`(53초, DuckDB 백엔드·모델 없음 상태) + `case-1~6.png` + `captions.srt`. Zetaris·Nightshift 붙인 뒤 **같은 스크립트로 다시 찍으면** 화면 상단 「backend zetaris-jdbc · model …」이 찍힌 최종본이 됨. 규정 1~4분이라 앞뒤에 문제 설명 15초·구조 한 장 15초를 더해 2분 안팎으로(ffmpeg concat 또는 recorder에 단계 추가).
+- Zetaris 로컬 스택 `docker compose up -d` 10:45 시작(에뮬레이션이라 느림) → 로그 scratchpad/zetaris_up.log, 확인 `docker compose ps`·`./verify.sh`. 그 뒤 순서: `zetaris/load_postgres.sh`(POSTGRES_PASSWORD는 번들 `.env`에서) → `.env.local`에 JDBC 값 → `.venv/bin/python zetaris/run_sql.py`(한 문장씩 실행, 오류는 출력만) → `ZETARIS_SCHEMA=lightning.metastore.demo.order_journey`로 `pytest`.
+- Nemotron 로컬 시험: rapid-mlx 모델 다운로드 완료(16.6GB). 영상 세션(llm-de)이 `…/video-kit/output/logs/slot_open` 파일로 10분 창을 열어 주면 `scratchpad/nemotron_slot.sh`(백그라운드 감시 중)가 포트 8197에 띄워 `scripts/llm_smoke.py` 실행 → 결과 `docs/nemotron_slot_run.log`·`docs/measurements.md`. 이 수치가 「citation check 통과율·지연」 근거.
+- **hackathon.genai.works 로그인은 안 했음**: 사이트는 「Sign in」 상태(쿠키 없음). Google 로그인 버튼을 누르면 계정 선택 창까지 감. 10/18 가입이 Google 로그인이었는지 이메일+비밀번호였는지 기록이 없어, 다른 방식으로 로그인하면 **계정이 둘이 되어 실격(규정 1절)** 위험 → 대표가 직접 로그인. 로그인 뒤 작업 공간의 제출 폼 칸(영상 링크·저장소·슬라이드·설명문·pre-existing·트랙 선택)을 확인해 `docs/submission_form.md`에 적을 것.
+
 - 저장소 `/Users/ollekil/Desktop/Moahub-Labs/hackathons/paid-but-nothing-arrived` — 첫 커밋 10/22 10:04 KST(빌드 윈도 10/22 09:00 KST 이후 ✔). `.venv`(Python 3.12, uv).
 - 돌아가는 것: `python data/gen_synthetic.py`(합성 데이터 4원천+5사례) → `pytest`(3 passed: 5사례 모두 정답 고리) → `uvicorn app.main:app --port 8765` → http://127.0.0.1:8765 (돈의 사슬 화면, 원본 행, 답장·조치·증거 묶음).
 - 지금은 Zetaris 없이 DuckDB(`agent/sql_backend.py`)로, LLM 없이 verifier 문장으로 돈다. 화면·결과에 `backend`·`llm`이 그대로 찍힘(속이지 않음).
