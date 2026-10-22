@@ -5,8 +5,9 @@ It asks a single SQL endpoint. In production that endpoint is Zetaris, which fed
 the four sources without moving the data. For offline development and tests the same
 queries run against the synthetic CSVs through DuckDB with identical table names.
 
-  ZETARIS_SQL_URL / ZETARIS_API_KEY   -> ZetarisBackend (REST SQL)
-  otherwise                           -> DuckDBBackend (local CSV)
+  ZETARIS_JDBC_URL + ZETARIS_JDBC_JAR  -> ZetarisJDBCBackend (bundled Lightning driver)
+  ZETARIS_SQL_URL / ZETARIS_API_KEY    -> ZetarisBackend (REST SQL)
+  otherwise                            -> DuckDBBackend (local CSV, tests)
 """
 from __future__ import annotations
 import os
@@ -59,7 +60,33 @@ class ZetarisBackend:
         return rows
 
 
+class ZetarisJDBCBackend:
+    """Official path for the local Zetaris platform: the bundled Lightning JDBC driver
+    (jdbc:zetaris:lightning@localhost:10000), one statement per call."""
+    name = "zetaris-jdbc"
+
+    def __init__(self, jdbc_url: str, user: str, password: str, jar: str, schema: str = ""):
+        import jaydebeapi
+        self.con = jaydebeapi.connect("com.zetaris.lightning.jdbc.LightningDriver", jdbc_url, [user, password], jar)
+        self.schema = schema
+
+    def query(self, sql: str) -> list[dict[str, Any]]:
+        if self.schema:
+            for t in TABLES:
+                sql = sql.replace(f" {t} ", f" {self.schema}.{t} ").replace(f" {t}\n", f" {self.schema}.{t}\n")
+        cur = self.con.cursor()
+        cur.execute(sql)
+        cols = [d[0] for d in cur.description] if cur.description else []
+        rows = [dict(zip(cols, [None if v is None else str(v) for v in row])) for row in cur.fetchall()] if cols else []
+        cur.close()
+        return rows
+
+
 def get_backend():
+    """Resolver: JDBC (local platform) > REST > DuckDB over the synthetic CSVs."""
+    jdbc = os.getenv("ZETARIS_JDBC_URL")
+    if jdbc and os.getenv("ZETARIS_JDBC_JAR"):
+        return ZetarisJDBCBackend(jdbc, os.getenv("ZETARIS_USER", ""), os.getenv("ZETARIS_PASSWORD", ""), os.environ["ZETARIS_JDBC_JAR"], os.getenv("ZETARIS_SCHEMA", ""))
     url, key = os.getenv("ZETARIS_SQL_URL"), os.getenv("ZETARIS_API_KEY")
     if url and key:
         return ZetarisBackend(url, key, os.getenv("ZETARIS_SCHEMA", ""))
