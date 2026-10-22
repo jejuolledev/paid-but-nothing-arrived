@@ -28,7 +28,8 @@ class DuckDBBackend:
             p = data_dir / f"{t}.csv"
             if not p.exists():
                 raise FileNotFoundError(f"{p} missing — run `python data/gen_synthetic.py` first")
-            self.con.execute(f"CREATE VIEW {t} AS SELECT * FROM read_csv_auto('{p}', header=true, all_varchar=true)")
+            cols = 'email_id, "to" AS to_address, event, ts, order_tag' if t == "mail_events" else "*"
+            self.con.execute(f"CREATE VIEW {t} AS SELECT {cols} FROM read_csv_auto('{p}', header=true, all_varchar=true)")
 
     def query(self, sql: str) -> list[dict[str, Any]]:
         cur = self.con.execute(sql)
@@ -82,8 +83,18 @@ class ZetarisJDBCBackend:
         return rows
 
 
+_CACHE: dict[str, Any] = {}
+
+
 def get_backend():
-    """Resolver: JDBC (local platform) > REST > DuckDB over the synthetic CSVs."""
+    """Resolver: JDBC (local platform) > REST > DuckDB over the synthetic CSVs. One connection per process."""
+    if "backend" in _CACHE:
+        return _CACHE["backend"]
+    _CACHE["backend"] = _make_backend()
+    return _CACHE["backend"]
+
+
+def _make_backend():
     jdbc = os.getenv("ZETARIS_JDBC_URL")
     if jdbc and os.getenv("ZETARIS_JDBC_JAR"):
         return ZetarisJDBCBackend(jdbc, os.getenv("ZETARIS_USER", ""), os.getenv("ZETARIS_PASSWORD", ""), os.environ["ZETARIS_JDBC_JAR"], os.getenv("ZETARIS_SCHEMA", ""))

@@ -8,7 +8,7 @@
 -- (PSP ledger REST, app database, log exports on S3, mail-provider REST) — same SQL for the agent.
 
 -- 1. datasource (administrator)
-CREATE DATASOURCE demo_pg DESCRIBE BY "synthetic seller sources: payments, orders, grants, server_logs, mail_events" OPTIONS (
+CREATE DATASOURCE demo_pg DESCRIBE BY "synthetic_seller_sources" OPTIONS (
   jdbcdriver "org.postgresql.Driver",
   jdbcurl "jdbc:postgresql://postgres:5432/demo",
   username "zetaris",
@@ -60,10 +60,10 @@ CREATE TABLE server_logs (
 );
 CREATE TABLE mail_events (
   email_id varchar(48) NOT NULL PRIMARY KEY,
-  "to" varchar(200),
+  to_address varchar(200),
   event varchar(16),
   ts varchar(32),
-  tag varchar(32) FOREIGN KEY REFERENCES orders(order_id)
+  order_tag varchar(32) FOREIGN KEY REFERENCES orders(order_id)
 )
 
 -- 3. activate each table from the registered source
@@ -71,7 +71,7 @@ ACTIVATE USL TABLE lightning.metastore.demo.order_journey.orders AS SELECT COALE
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.payments AS SELECT COALESCE(payment_id,'') AS payment_id, amount, currency, status, card_last4, customer_email, created_at FROM demo_pg.payments;
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.grants AS SELECT COALESCE(grant_id,'') AS grant_id, email, reward_key, credits, status, order_id, created_at FROM demo_pg.grants;
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.server_logs AS SELECT COALESCE(ts,'') AS ts, route, order_id, http_status, message FROM demo_pg.server_logs;
-ACTIVATE USL TABLE lightning.metastore.demo.order_journey.mail_events AS SELECT COALESCE(email_id,'') AS email_id, "to", event, ts, tag FROM demo_pg.mail_events;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.mail_events AS SELECT COALESCE(email_id,'') AS email_id, to_address, event, ts, order_tag FROM demo_pg.mail_events;
 
 -- 4. smoke test — the join the agent relies on. The agent sets ZETARIS_SCHEMA=lightning.metastore.demo.order_journey
 SELECT o.order_id, o.status, p.status AS psp_status, g.grant_id

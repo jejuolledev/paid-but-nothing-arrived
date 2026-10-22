@@ -15,7 +15,7 @@ CREATE TABLE payments (payment_id text, amount text, currency text, status text,
 CREATE TABLE orders (order_id text, payment_id text, email text, reward_key text, amount text, status text, credited text, created_at text, updated_at text);
 CREATE TABLE grants (grant_id text, email text, reward_key text, credits text, status text, order_id text, created_at text);
 CREATE TABLE server_logs (ts text, route text, order_id text, http_status text, message text);
-CREATE TABLE mail_events (email_id text, "to" text, event text, ts text, tag text);
+CREATE TABLE mail_events (email_id text, to_address text, event text, ts text, order_tag text);
 SQL
 for t in payments orders grants server_logs mail_events; do
   docker compose exec -T postgres psql -U zetaris -d demo -c "\\copy $t FROM STDIN WITH (FORMAT csv, HEADER true)" < "$DATA/$t.csv"

@@ -34,7 +34,7 @@ class Tools:
             "payments": _tag("payments", self.db.query(f"SELECT * FROM payments WHERE {pay_where} ORDER BY created_at")),
             "grants": _tag("grants", self.db.query(f"SELECT * FROM grants WHERE order_id = '{order_id}' OR (lower(email) = lower('{email}') AND reward_key = '{o[0]['reward_key']}') ORDER BY created_at")),
             "server_logs": _tag("server_logs", self.db.query(f"SELECT * FROM server_logs WHERE order_id = '{order_id}' ORDER BY ts")),
-            "mail_events": _tag("mail_events", self.db.query(f"SELECT * FROM mail_events WHERE tag = '{order_id}' OR lower(\"to\") = lower('{email}') ORDER BY ts")),
+            "mail_events": _tag("mail_events", self.db.query(f"SELECT * FROM mail_events WHERE order_tag = '{order_id}' OR lower(to_address) = lower('{email}') ORDER BY ts")),
         }
 
     def related_orders(self, email: str) -> list[dict[str, Any]]:

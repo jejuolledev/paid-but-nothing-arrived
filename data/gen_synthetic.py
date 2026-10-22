@@ -8,7 +8,7 @@ Sources (mirroring the shapes of real systems, not their data):
   orders.csv       app database: orders
   grants.csv       app database: digital credit grants
   server_logs.csv  web server / webhook / cron log export
-  mail_events.csv  transactional mail events (Resend-like)
+  mail_events.csv  transactional mail events (Resend-like; order_tag = order id)
 Ground truth for the five seeded cases is written to cases.json.
 """
 from __future__ import annotations
@@ -48,8 +48,8 @@ def main() -> None:
                  dict(ts=ts(when+timedelta(seconds=6)), route="/api/payments/confirm", order_id=order_id, http_status=200, message="confirmed; credits granted"),
                  dict(ts=ts(when+timedelta(seconds=9)), route="/api/mail/send", order_id=order_id, http_status=200, message="credit mail queued")])
         mid = f"m_{order_id}"
-        mails.extend([dict(email_id=mid, to=em, event="sent", ts=ts(when+timedelta(seconds=10)), tag=order_id),
-                  dict(email_id=mid, to=em, event="delivered", ts=ts(when+timedelta(seconds=25)), tag=order_id)])
+        mails.extend([dict(email_id=mid, to=em, event="sent", ts=ts(when+timedelta(seconds=10)), order_tag=order_id),
+                  dict(email_id=mid, to=em, event="delivered", ts=ts(when+timedelta(seconds=25)), order_tag=order_id)])
 
     # 200 normal orders
     for i in range(1, 201):
@@ -92,7 +92,7 @@ def main() -> None:
              dict(ts=ts(when+timedelta(seconds=70)), route="/api/payments/confirm", order_id="ord_0903", http_status=504, message="grant batch timed out after 60s (row was written)"),
              dict(ts=ts(when+timedelta(minutes=3)), route="/api/admin/grants/retry", order_id="ord_0903", http_status=200, message="manual retry; granted again")]
     mid = "m_ord_0903"
-    mails += [dict(email_id=mid, to=em, event="sent", ts=ts(when+timedelta(minutes=3, seconds=5)), tag="ord_0903"), dict(email_id=mid, to=em, event="delivered", ts=ts(when+timedelta(minutes=4)), tag="ord_0903")]
+    mails += [dict(email_id=mid, to=em, event="sent", ts=ts(when+timedelta(minutes=3, seconds=5)), order_tag="ord_0903"), dict(email_id=mid, to=em, event="delivered", ts=ts(when+timedelta(minutes=4)), order_tag="ord_0903")]
     cases.append(dict(case=3, title="Granted twice", email=em, order_id="ord_0903", broken_link="credit_granted",
                       expected="Two grant rows for the same email and reward; the first confirm timed out after writing, then a manual retry granted again."))
 
