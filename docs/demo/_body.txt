@@ -1,0 +1,11 @@
+"I paid, but nothing arrived."
+
+Every online seller gets this message. A slow answer becomes a card dispute.
+The evidence is spread over four systems: the payment provider, the orders
+database, the server logs, the mail provider.
+
+This agent asks one SQL door (Zetaris), walks the money chain, marks the one
+link that broke - with the raw rows that prove it - and a local Nemotron
+(Meterless Nightshift) explains. Customer data never leaves the machine.
+
+Track 02 - The Agent That Can Explain Why. All data synthetic.
