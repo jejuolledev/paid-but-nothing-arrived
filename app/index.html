@@ -38,10 +38,20 @@ details{margin-top:14px}details>summary{cursor:pointer;font-size:18px;font-weigh
 .timeline li:last-child{padding-bottom:0}.timeline .tool{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--mut)}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .card-head h2{margin:0}
+.how-link{display:inline-block;margin:4px 0 8px;padding:0;font-size:12px;background:none;border:0;color:var(--acc);cursor:pointer;text-decoration:underline}
+.how{margin:10px 0 8px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.how-label{font-size:12px;color:var(--mut);margin:0 0 10px;font-weight:600}
+.how-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}@media(max-width:700px){.how-steps{grid-template-columns:repeat(2,1fr)}}
+.how-step{display:flex;gap:8px;align-items:flex-start;min-width:0}
+.how-n{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--acc);background:#0c0e12;line-height:1}
+.how-step b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+.how-step span{display:block;font-size:12px;color:var(--mut);margin-top:2px;line-height:1.35}
 </style></head><body>
 <header>
   <div class="top"><h1 id="title"></h1><div class="lang" id="lang"></div></div>
   <p class="sub" id="subtitle"></p>
+  <button type="button" class="how-link" id="how-link" hidden></button>
+  <div class="how" id="how"></div>
   <p class="sponsors" id="sponsors"></p>
 </header>
 <main>
@@ -100,6 +110,15 @@ const I18N={
     fixedNote:(id,by,ts)=>'Fixed and logged — audit '+id+', approved by '+by+' at '+ts,
     routedBy:(model,rid)=>'Routed by Meterless Nightshift → '+model+' · receipt '+rid,
     modelLabel:'model',
+    howTitle:'How it works',
+    how1:'Paste the customer message',
+    how1d:'their email is enough',
+    how2:'One SQL door reads your records',
+    how2d:'payments, orders, credits, logs, mail — read-only, via Zetaris',
+    how3:'The agent investigates',
+    how3d:'Nemotron via Meterless Nightshift picks what to check; emails masked',
+    how4:'You approve the fix',
+    how4d:'the chain turns green; every fix is logged',
   },
   ko:{
     title:'결제했는데 아무것도 안 왔어요.',
@@ -141,6 +160,15 @@ const I18N={
     fixedNote:(id,by,ts)=>'수정 완료·기록됨 — 감사 '+id+', 승인자 '+by+', '+ts,
     routedBy:(model,rid)=>'Meterless Nightshift 경유 → '+model+' · receipt '+rid,
     modelLabel:'모델',
+    howTitle:'작동 방식',
+    how1:'고객 메시지를 붙여 넣기',
+    how1d:'이메일만 있어도 됩니다',
+    how2:'SQL 한 문으로 기록을 읽습니다',
+    how2d:'결제·주문·크레딧·로그·메일 — 읽기 전용, Zetaris 경유',
+    how3:'에이전트가 조사합니다',
+    how3d:'Meterless Nightshift의 Nemotron이 확인할 항목을 고릅니다. 이메일은 가려집니다',
+    how4:'수정은 당신이 승인합니다',
+    how4d:'연결고리가 초록으로 바뀌고, 모든 수정은 기록됩니다',
   }
 };
 
@@ -154,6 +182,7 @@ const EXAMPLES={
 };
 
 let lang='en', lastResult=null, casesCache=[];
+let howOpen=true, howSeenResult=false;
 
 function t(){return I18N[lang]||I18N.en;}
 function loadLang(){
@@ -161,6 +190,23 @@ function loadLang(){
 }
 function saveLang(){
   try{localStorage.setItem('ui-lang',lang);}catch(_){}
+}
+
+function renderHow(){
+  const i=t();
+  const steps=[[i.how1,i.how1d],[i.how2,i.how2d],[i.how3,i.how3d],[i.how4,i.how4d]];
+  $('#how').innerHTML=`<p class="how-label">${esc(i.howTitle)}</p><div class="how-steps">${steps.map(([t,d],n)=>`<div class="how-step"><span class="how-n">${esc(n+1)}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('')}</div>`;
+  const link=$('#how-link');
+  link.textContent=i.howTitle;
+  $('#how').hidden=!howOpen;
+  link.hidden=!howSeenResult;
+}
+
+function hideHowAfterResult(){
+  if(howSeenResult)return;
+  howSeenResult=true;
+  howOpen=false;
+  renderHow();
 }
 
 function applyChrome(){
@@ -176,6 +222,7 @@ function applyChrome(){
   document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;saveLang();applyChrome();renderSamples();if(lastResult)render(lastResult);});
   const eh=$('#empty-hint');
   if(eh.dataset.show==='1')eh.textContent=i.emptyHint;
+  renderHow();
   renderSamples();
 }
 
@@ -257,6 +304,7 @@ async function run(){
     const res=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
     if(!res.ok){
       lastResult=null;
+      hideHowAfterResult();
       $('#out').innerHTML=`<div class="card"><div class="headline">${esc(i.errHttp)}</div><p class="hint">${esc(i.emptyHint)}</p></div>`;
       $('#status').textContent='';
       return;
@@ -268,6 +316,7 @@ async function run(){
     render(r);
   }catch(_){
     lastResult=null;
+    hideHowAfterResult();
     $('#out').innerHTML=`<div class="card"><div class="headline">${esc(i.errNetwork)}</div><p class="hint">${esc(i.emptyHint)}</p></div>`;
     $('#status').textContent='';
   }finally{
@@ -297,6 +346,7 @@ function renderSteps(steps){
 
 function render(r, auditNote){
   const i=t();
+  hideHowAfterResult();
   if(!r.ok){
     $('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div><p class="hint">${esc(i.noOrderHint)}</p></div>`;
     return;
@@ -392,6 +442,7 @@ async function evidence(){
 }
 
 $('#go').onclick=run;
+$('#how-link').onclick=()=>{howOpen=!howOpen;renderHow();};
 $('#msg').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();run();}
 });
