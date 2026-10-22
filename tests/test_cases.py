@@ -151,3 +151,12 @@ def test_moving_credits_needs_customer_confirmation():
     except NeedsCustomerConfirmation:
         pass
     assert approve("ord_0906", backend=db, customer_confirmed=True)["after"]["broken"] is None
+
+
+def test_mismatch_reply_must_wait_for_confirmation():
+    from types import SimpleNamespace
+    from agent.investigator import _reply_ok, _template_reply
+    v = SimpleNamespace(broken="account_mismatch", headline="Paid, but the credits went to a different account.")
+    assert not _reply_ok("Your payment went through to a different email. We are moving the credits to your account right away.", v)
+    assert _reply_ok("Your payment went through, but the order used a slightly different email address. Could you confirm it is yours? Then I will move the credits.", v)
+    assert _reply_ok(_template_reply(v), v) and _reply_ok(_template_reply(v, "ko"), v)

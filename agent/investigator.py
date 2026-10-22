@@ -18,7 +18,9 @@ SYSTEM = (
     "brackets, e.g. [orders:ord_0901] or [server_logs:2026-10-13T12:00:44Z@/api/payments/confirm]. Never invent a row. "
     "Output JSON with keys: explanation (<=120 words, cite at least one ref), "
     "customer_reply (written BY the seller TO the customer, <=90 words, plain and kind; state what happened and what you will do; "
-    "if nothing was charged say so clearly; never ask the customer to investigate; no internal refs), "
+    "if nothing was charged say so clearly; never ask the customer to investigate; no internal refs; "
+    "never say a fix is done or under way — the seller has not approved it yet; if the chain shows credits went to a "
+    "different address, ask the customer to confirm that address and say the credits move after they confirm), "
     "fix_action (one imperative sentence for the seller)."
 )
 
@@ -199,6 +201,9 @@ def _reply_ok(reply: str, v) -> bool:
         return False
     if re.search(r"refund|compensat|discount|free|voucher|환불|보상|할인|무료", reply, re.I):
         return False  # the model may not promise money; a person decides that
+    if v.broken == "account_mismatch" and (not re.search(r"confirm|확인해", reply, re.I)
+                                           or re.search(r"(are|am|we're|i'm) (now )?moving|right away|already moved|옮기고 있|옮겼", reply, re.I)):
+        return False  # credits move only after the customer confirms and the seller approves
     key = v.broken if v.broken in REPLY_MUST else None
     if key is None and "never charged" not in v.headline.lower() and v.broken is None:
         return bool(re.search(r"in your account|went through|everything|이용권|계정", reply, re.I))
