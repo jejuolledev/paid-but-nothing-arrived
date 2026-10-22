@@ -2,11 +2,11 @@
 
 이 파일은 다음 세션(Opus/Fable 누구든)이 바로 이어 하기 위한 것. 영어 제출물(README·슬라이드·영상 자막)은 이 저장소 안에, 한국어 메모는 여기에만.
 
-## 0. 지금 상태 (10/22 10:50 KST 갱신)
+## 0. 지금 상태 (10/22 오전 갱신 — 아래 시각은 대략치)
 - GitHub 비공개 저장소 생성·푸시됨: https://github.com/jejuolledev/paid-but-nothing-arrived (제출 전에 `gh repo edit --visibility public --accept-visibility-change-consequences`).
-- 데모 **Zetaris 백엔드 판** 녹화 완료 11:05: `docs/demo/walkthrough_zetaris.mp4`(2분 10초, 화면에 「backend zetaris-jdbc · model none」), 캡처 case-1~6, captions.srt. Nightshift/Nemotron 붙인 뒤 한 번 더 찍으면 model 칸이 채워짐(`rm -rf docs/demo && node scripts/record_demo.mjs && ffmpeg …`). 제출 폼 값은 `docs/submission_form.md`.
+- 데모 **Zetaris 백엔드 판** 녹화 완료(10/22 오전): `docs/demo/walkthrough_zetaris.mp4`(2분 10초, 화면에 「backend zetaris-jdbc · model none」), 캡처 case-1~6, captions.srt. Nightshift/Nemotron 붙인 뒤 한 번 더 찍으면 model 칸이 채워짐(`rm -rf docs/demo && node scripts/record_demo.mjs && ffmpeg …`). 제출 폼 값은 `docs/submission_form.md`.
 - (이전) 데모 초안: `scripts/record_demo.mjs`(Playwright headless, 1280×720, 자막 배너 주입) → `docs/demo/walkthrough_draft.mp4`(53초, DuckDB 백엔드·모델 없음 상태) + `case-1~6.png` + `captions.srt`. Zetaris·Nightshift 붙인 뒤 **같은 스크립트로 다시 찍으면** 화면 상단 「backend zetaris-jdbc · model …」이 찍힌 최종본이 됨. 규정 1~4분이라 앞뒤에 문제 설명 15초·구조 한 장 15초를 더해 2분 안팎으로(ffmpeg concat 또는 recorder에 단계 추가).
-- Zetaris 로컬 스택 `docker compose up -d` 10:45 시작(에뮬레이션이라 느림) → 로그 scratchpad/zetaris_up.log, 확인 `docker compose ps`·`./verify.sh`. 그 뒤 순서: `zetaris/load_postgres.sh`(POSTGRES_PASSWORD는 번들 `.env`에서) → `.env.local`에 JDBC 값 → `.venv/bin/python zetaris/run_sql.py`(한 문장씩 실행, 오류는 출력만) → `ZETARIS_SCHEMA=lightning.metastore.demo.order_journey`로 `pytest`.
+- Zetaris 로컬 스택 `docker compose up -d` 완료(가동 중)(에뮬레이션이라 느림) → 로그 scratchpad/zetaris_up.log, 확인 `docker compose ps`·`./verify.sh`. 그 뒤 순서: `zetaris/load_postgres.sh`(POSTGRES_PASSWORD는 번들 `.env`에서) → `.env.local`에 JDBC 값 → `.venv/bin/python zetaris/run_sql.py`(한 문장씩 실행, 오류는 출력만) → `ZETARIS_SCHEMA=lightning.metastore.demo.order_journey`로 `pytest`.
 - Nemotron 로컬 시험: rapid-mlx 모델 다운로드 완료(16.6GB). 영상 세션(llm-de)이 `…/video-kit/output/logs/slot_open` 파일로 10분 창을 열어 주면 `scratchpad/nemotron_slot.sh`(백그라운드 감시 중)가 포트 8197에 띄워 `scripts/llm_smoke.py` 실행 → 결과 `docs/nemotron_slot_run.log`·`docs/measurements.md`. 이 수치가 「citation check 통과율·지연」 근거.
 - **hackathon.genai.works 로그인은 안 했음**: 사이트는 「Sign in」 상태(쿠키 없음). Google 로그인 버튼을 누르면 계정 선택 창까지 감. 10/18 가입이 Google 로그인이었는지 이메일+비밀번호였는지 기록이 없어, 다른 방식으로 로그인하면 **계정이 둘이 되어 실격(규정 1절)** 위험 → 대표가 직접 로그인. 로그인 뒤 작업 공간의 제출 폼 칸(영상 링크·저장소·슬라이드·설명문·pre-existing·트랙 선택)을 확인해 `docs/submission_form.md`에 적을 것.
 
@@ -15,7 +15,7 @@
 - 지금은 Zetaris 없이 DuckDB(`agent/sql_backend.py`)로, LLM 없이 verifier 문장으로 돈다. 화면·결과에 `backend`·`llm`이 그대로 찍힘(속이지 않음).
 
 ## 1. 후원사 필수 연동 — 진행 상황
-### Zetaris (필수) — ✅ 10/22 10:40 연동 완료
+### Zetaris (필수) — ✅ 10/22 오전 연동 완료
 - 로컬 스택 가동 중(`docker compose ps` 전부 healthy, bootstrap만 one-shot), JDBC `SELECT 1` 4.8s. 합성 CSV 5개를 번들 Postgres `demo` DB에 적재(`zetaris/load_postgres.sh`), `zetaris/register.sql`로 데이터소스 `demo_pg` + 네임스페이스 `lightning.metastore.demo` + USL `order_journey` 등록·활성화 완료(`zetaris/run_sql.py`). 조인 스모크 쿼리 OK.
 - 에이전트 5사례 pytest **zetaris-jdbc 백엔드로 5/5 통과**(1사례 약 9초 — 에뮬레이션 Spark). `.env.local` 작성됨(비밀번호는 번들 `.env`에서; 커밋 제외).
 - Lightning DDL이 거부한 것: 설명문에 공백/콜론, 열 이름 `to`(백틱도 안 됨)·`tag` → `to_address`·`order_tag`로 전부 개명(생성기·CSV·Postgres·tools·DuckDB 뷰). `SHOW NAMESPACES`는 비활성(`SHOW NAMESPACES IN …` 아님, 그냥 못 씀).
@@ -41,7 +41,7 @@
 ### NVIDIA (특별상)
 - 모델: Nemotron 3.5 Lightning(로컬) — Nightshift 또는 rapid-mlx. 클라우드 예비: OpenRouter `nvidia/nemotron-3.5-lightning:free`(키 없음, 대표 가입 필요 — 없어도 됨).
 
-## 2. 남은 제출물 (규정 6절) — 11:20 현재 초안 전부 있음
+## 2. 남은 제출물 (규정 6절) — 10/22 오전 현재 초안 전부 있음
 - ✅ 영상 `docs/demo/final.mp4` 2분 40초(제목 카드 14초 + Zetaris 백엔드 워크스루 2분 10초 + 구조 카드 16초, 무음·자막 배너). 만드는 법: `node scripts/record_demo.mjs && bash scripts/build_video.sh`. Nightshift 연동 후 한 번 더 돌리면 「model …」 칸이 채워진 최종본.
 - ✅ 슬라이드 `docs/slides.pdf`(marp, 10장) ← `docs/slides.md`. 제품 화면 장에는 `docs/demo/case-*.png`를 넣으면 더 좋음(지금은 글만).
 - ✅ 저장소(비공개) + README · ✅ `docs/sponsor-tech.md` · ✅ `docs/submission_form.md`(폼에 붙일 값).

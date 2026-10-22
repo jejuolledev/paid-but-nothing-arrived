@@ -14,8 +14,9 @@ from .tools import Tools, OPENAI_TOOLS
 
 SYSTEM = (
     "You are a payments investigator for a small online seller. You may only state facts that "
-    "are supported by rows the tools returned, and you must cite them as [ref] using the exact `ref` "
-    "values. Never invent a row. Output JSON with keys: explanation (<=120 words, cite refs), "
+    "are supported by rows the tools returned, and you must cite them with the exact `ref` value in square "
+    "brackets, e.g. [orders:ord_0901] or [server_logs:2026-10-13T12:00:44Z@/api/payments/confirm]. Never invent a row. "
+    "Output JSON with keys: explanation (<=120 words, cite at least one ref), "
     "customer_reply (plain, kind, <=90 words, no internal refs), fix_action (one imperative sentence)."
 )
 
@@ -38,8 +39,13 @@ def _client():
     return OpenAI(base_url=base, api_key=key or "local"), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
 
 
+REF_RE = re.compile(r"(?:payments|orders|grants|server_logs|mail_events):[A-Za-z0-9_./@:+-]+")
+
+
 def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
-    cited = re.findall(r"\[([a-z_]+:[^\]]+)\]", text)
+    """Accepts [orders:ord_0901], [ref: orders:ord_0901] or a bare orders:ord_0901 — but every cited
+    ref must be one the tools actually returned, and there must be at least one."""
+    cited = [c.rstrip(".,;)") for c in REF_RE.findall(text)]
     bad = [c for c in cited if c not in refs]
     return (len(cited) > 0 and not bad), bad
 
@@ -77,6 +83,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
                 messages=[{"role": "system", "content": SYSTEM},
                           {"role": "user", "content": json.dumps({"customer_message": message, "chain": verdict.to_dict(), "rows": journey}, default=str)}])
             texts = json.loads(resp.choices[0].message.content); llm_used = model
+            texts["_raw_explanation"] = texts.get("explanation", "")
             ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
             if not ok:
                 texts["explanation"] = verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs)

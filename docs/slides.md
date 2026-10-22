@@ -71,8 +71,9 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # Product
 
-(screens: chain with red link · cited rows · reply / fix / evidence · case 5 "Nothing is broken. You were never charged.")
+![w:560](demo/case-2.png) ![w:560](demo/case-6.png)
 
+Left: case 1, chain breaks at "Order confirmed", cited rows one click away. Right: case 5, grey chain — "Nothing is broken. You were never charged."
 All data synthetic. The five cases are bugs we found in our own checkout — two happened on real payments.
 
 ---

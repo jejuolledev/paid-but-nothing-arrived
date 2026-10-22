@@ -1,0 +1,13 @@
+slot opened 10:36:42
+server up 10:36:48
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+{"case": 1, "verdict_ok": true, "llm": "nemotron-3.5-lightning-30b-4bit", "citations": {"checked": true, "ok": false, "unknown_refs": [], "replaced_with_verifier_text": true}, "ms": 13079, "reply_len": 168}
+{"case": 2, "verdict_ok": true, "llm": "nemotron-3.5-lightning-30b-4bit", "citations": {"checked": true, "ok": true, "unknown_refs": []}, "ms": 11880, "reply_len": 190}
+{"case": 3, "verdict_ok": true, "llm": "nemotron-3.5-lightning-30b-4bit", "citations": {"checked": true, "ok": false, "unknown_refs": [], "replaced_with_verifier_text": true}, "ms": 13881, "reply_len": 197}
+{"case": 4, "verdict_ok": true, "llm": "nemotron-3.5-lightning-30b-4bit", "citations": {"checked": true, "ok": false, "unknown_refs": [], "replaced_with_verifier_text": true}, "ms": 14130, "reply_len": 189}
+{"case": 5, "verdict_ok": true, "llm": "nemotron-3.5-lightning-30b-4bit", "citations": {"checked": true, "ok": false, "unknown_refs": ["ref: orders:ord_0905", "ref: server_logs:2026-10-20T05:00:00Z@/api/checkout/start"], "replaced_with_verifier_text": true}, "ms": 11808, "reply_len": 128}
+| 2026-10-22 10:37 | nemotron-3.5-lightning-30b-4bit | verdict 5/5 | citations passed 1/5 | avg 12955 ms |
+smoke done 10:37:54
+slot released 10:37:57

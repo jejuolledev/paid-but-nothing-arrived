@@ -24,6 +24,8 @@ for c in cases:
     r = investigate(f"Hi, I paid but nothing arrived. My order is {c['order_id']}.")
     rows.append(dict(case=c["case"], verdict_ok=r["broken"] == c["broken_link"], llm=r["llm"],
                      citations=r["citation_check"], ms=r["elapsed_ms"], reply_len=len(r["customer_reply"])))
+    print("   explanation:", r["explanation"][:300].replace("\n", " "))
+    print("   reply:", r["customer_reply"][:200].replace("\n", " "))
     print(json.dumps(rows[-1], ensure_ascii=False))
 ok = sum(x["verdict_ok"] for x in rows); cit = sum(1 for x in rows if x["citations"].get("ok"))
 line = f"| {time.strftime('%Y-%m-%d %H:%M')} | {rows[0]['llm']} | verdict {ok}/{len(rows)} | citations passed {cit}/{len(rows)} | avg {sum(x['ms'] for x in rows)//len(rows)} ms |"
