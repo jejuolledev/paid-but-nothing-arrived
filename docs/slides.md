@@ -69,9 +69,9 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # How Meterless + NVIDIA were used
 
-- Nightshift serves Nemotron locally at an OpenAI-compatible address; remote endpoints are refused by default and identity fields are redacted before the model sees rows.
+- Every model call goes through Nightshift on the Mac: a Nemotron lane, a small on-device verifier lane, a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured: 5 seeded cases → correct link 5/5, citation check 5/5, ~14 s per case on a laptop.
+- Measured: 6 cases → right order and link 6/6, citation check 6/6 through Nightshift → Nemotron; fully offline Nemotron 30B on the Mac: 5/5, ~14 s per case.
 
 ---
 

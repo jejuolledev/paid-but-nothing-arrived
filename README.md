@@ -24,7 +24,9 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
                                      federated by Zetaris             (decides)          (explains, cited)
 ```
 - `agent/sql_backend.py` — the only place that talks to data. Zetaris (JDBC or REST) in production; DuckDB over the synthetic CSVs for tests, same table names, same SQL.
-- `agent/tools.py` — the three tools the agent may call (`find_orders`, `order_journey`, `related_orders`). Every row carries a `ref` = `table:key`.
+- `agent/tools.py` — the read-only tools (`find_orders`, `find_payments`, `order_for_payment`, `order_journey`, `related_orders`). Every row carries a `ref` = `table:key`.
+- `agent/agent_loop.py` — the investigation loop: Nemotron picks the next tool; the tools only follow the sender's own trail.
+- `agent/actions.py` — human-approved fixes with an audit log (offline demo; Zetaris stays read-only).
 - `agent/chain.py` — the verifier. Green / red / grey per link, each with the refs that decided it. The model never overrides it.
 - `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check.
 - `app/` — FastAPI + a single page: the chain, "why" with clickable citations, verified / not verified, reply draft, fix (needs approval), dispute evidence bundle.
@@ -32,15 +34,15 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
 ## Requirements
 - Python 3.12 (`uv venv --python 3.12 .venv && uv pip install -r requirements.txt`)
 - Zetaris platform (local Docker Compose bundle from Zetaris Cloud) + Java 21 for the bundled JDBC driver — or nothing at all for the offline mode
-- Meterless Nightshift (Mac) serving a local Nemotron 3.5 Lightning — or any OpenAI-compatible endpoint
+- Meterless Nightshift (Mac) with an NVIDIA Nemotron lane (your NVIDIA key) — or any OpenAI-compatible endpoint on this machine (e.g. rapid-mlx serving Nemotron 3.5 Lightning 30B 4-bit for fully offline use)
 - Docker (we used colima with Rosetta on Apple Silicon)
 
 ## Setup
 ```bash
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python data/gen_synthetic.py          # 4 synthetic sources + 5 seeded cases
+.venv/bin/python data/gen_synthetic.py          # 4 synthetic sources + 6 seeded cases
 cp .env.example .env.local                       # fill Zetaris / Nightshift values (see below)
-.venv/bin/python -m pytest -q                    # 5 seeded cases must resolve to the right link
+.venv/bin/python -m pytest -q                    # seeded cases, injection and approval tests
 .venv/bin/uvicorn app.main:app --port 8765       # open http://127.0.0.1:8765
 ```
 Zetaris: `zetaris/register.sql` registers the five sources and builds the `order_journey` semantic layer. Nightshift: turn the hotspot on, copy the local address and key into `.env.local` (`NIGHTSHIFT_BASE_URL`, `NIGHTSHIFT_API_KEY`).
@@ -49,7 +51,7 @@ Zetaris: `zetaris/register.sql` registers the five sources and builds the `order
 Paste a customer message (or click a seeded case). The result page shows the chain, the broken link, the cited rows, what was verified and what was not, a reply draft, a fix that requires your approval, and a dispute evidence bundle (`/api/evidence`). The JSON API is `POST /api/investigate {"message": "..."}`.
 
 ## Synthetic data statement
-**All data is synthetic. No real customer data was used.** Emails end in `@example.com`; card last-4 digits are public test card numbers; 200 healthy orders are generated with a fixed seed. The five seeded cases are bugs we found in our own checkout while auditing it — two of them happened on real payments — rebuilt here with made-up records:
+**All data is synthetic. No real customer data was used.** Emails end in `@example.com`; card last-4 digits are public test card numbers; 200 healthy orders are generated with a fixed seed. The six seeded cases are bugs we found in our own checkout while auditing it — two of them happened on real payments — rebuilt here with made-up records:
 1. Paid but not credited (retry succeeded at the PSP, our confirm trusted a stale *failed* status)
 2. Paid, confirm never called (the confirm button was unreachable after payment)
 3. Granted twice (grant timed out after writing, manual retry granted again)
@@ -59,7 +61,7 @@ Paste a customer message (or click a seeded case). The result page shows the cha
 ## Sponsor technologies
 See `docs/sponsor-tech.md` for the full write-up.
 - **Zetaris** — the one SQL door. Payments, orders, grants, server logs and mail events are registered as sources and joined in a unified semantic layer `order_journey`; the agent only ever sends SQL to Zetaris.
-- **Meterless Nightshift** — local OpenAI-compatible runtime for Nemotron. The agent refuses non-local model endpoints unless `ALLOW_CLOUD_LLM=1`, and customer identity fields (email, card last 4, mail address) are removed before rows reach the model.
+- **Meterless Nightshift** — the model gateway on the seller's Mac: an NVIDIA Nemotron lane, a small on-device verifier lane, and a compute receipt for every answer, shown on screen. The agent refuses model endpoints that are not on this machine unless `ALLOW_CLOUD_LLM=1`; the sender's address becomes `CUSTOMER`, other addresses keep only a first letter and domain, and card digits are removed before rows reach the model.
 - **NVIDIA Nemotron 3.5 Lightning** — the explaining model (local, OpenMDW-1.1 license).
 - **Cursor** — development; see `docs/sponsor-tech.md`.
 
@@ -79,7 +81,7 @@ None of our product code. Open-source libraries only (`requirements.txt`). Every
 
 ## Limitations
 - The verifier covers the five link types we have seen; new failure shapes land in "not verified" rather than being guessed.
-- Model output is advisory; fix actions are never executed by the agent.
+- Model output is advisory. A fix runs only after the seller clicks Approve (offline demo); moving credits to another address also needs the customer's confirmation. On Zetaris the agent is read-only.
 
 ## License
 MIT
