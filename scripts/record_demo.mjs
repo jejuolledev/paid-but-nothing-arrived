@@ -29,8 +29,10 @@ let n = 0;
 for (const s of steps) {
   n++;
   await page.fill('#msg', `Hi, I paid but nothing arrived. My order is ${s.id}.`);
+  await page.evaluate(() => { document.getElementById('out').innerHTML = ''; });
   await page.click('#go');
-  await page.waitForSelector('.link', { timeout: 20000 });
+  await page.waitForSelector('.link', { timeout: 60000 });
+  await page.waitForFunction(() => /ms ·/.test(document.getElementById('status').textContent), null, { timeout: 60000 });
   await page.evaluate(c => { document.getElementById('cap').textContent = c; }, s.caption);
   await page.waitForTimeout(800);
   await page.screenshot({ path: path.join(out, `case-${n}.png`) });
