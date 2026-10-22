@@ -1,28 +1,29 @@
 # Sponsor technologies — how each one is used
 
 ## How Zetaris was integrated
-Zetaris is the only thing the agent talks to. The four systems a seller would otherwise open by hand — the payment-service-provider ledger, the orders/grants database, the server log export and the mail-provider events — are registered as Zetaris sources and related in a unified semantic layer called `order_journey` (`zetaris/register.sql`: `CREATE DATASOURCE … REGISTER DATASOURCE TABLES … COMPILE USL … ACTIVATE USL TABLE`). The agent's three tools (`find_orders`, `order_journey`, `related_orders`) are plain SQL sent through the bundled Lightning JDBC driver (`agent/sql_backend.py`, `ZetarisJDBCBackend`). Nothing is copied into the agent; every row it shows the seller is read in place and carries a `ref` (`table:key`) so the verdict can be traced back to the source.
+Zetaris is the only thing the agent queries. The four systems a seller would otherwise open by hand — the payment-provider ledger, the orders and credit-grants database, the server-log export and the mail-provider events — are registered as Zetaris datasources (the local Zetaris platform, Lightning JDBC) and related in one semantic layer, `order_journey` (`zetaris/register.sql`). The agent's tools send SQL only; nothing is copied out of the source systems, and every returned row carries `table:key` so any conclusion can cite it.
 
-Why this problem fits Zetaris: the evidence for "I paid but nothing arrived" is never in one system. The PSP knows the charge, the app database knows the order and the grant, the server log knows which calls happened, the mail provider knows whether the customer was told. "Query across silos, nothing moves" is exactly the shape of the question.
-
-For development and the test suite the same SQL runs against the synthetic CSVs through DuckDB with identical table names; the backend in use is printed on every result so the two are never confused.
+- Read-only by design. When the seller approves a fix, Zetaris is not written to: the fix belongs to the seller's own systems. In the offline demo (DuckDB over the same synthetic CSVs, same table names, same SQL) the fix is applied so the chain can be seen turning green; on Zetaris the approve endpoint answers "read-only" instead of pretending.
+- Measured: the verifier answers in ~9 s through the local Zetaris platform for a full five-source journey (Docker on an Apple-silicon laptop).
 
 ## How Meterless was integrated
-Meterless Nightshift serves a local NVIDIA Nemotron behind its OpenAI-compatible endpoint (`NIGHTSHIFT_BASE_URL`, default `http://127.0.0.1:8088/v1`). The agent uses it for the three things a model is good at and a verifier is not: explaining the broken link in plain language and drafting the reply to the customer (the fix itself comes from the verifier). The agent refuses non-local endpoints unless `ALLOW_CLOUD_LLM=1`, and removes identity fields (email, card last 4, mail address) before rows reach the model.
+Every model call goes to Meterless Nightshift's OpenAI-compatible Runtime on the seller's Mac (`http://127.0.0.1:8088/v1`, key read from Nightshift's own token file). The app identifies itself (`meterless-app: paid-but-nothing-arrived`), so the seller can see and bind its routing in Nightshift's Apps panel. Nightshift seats an **NVIDIA Nemotron 3.5 Lightning** lane on the seller's NVIDIA key, keeps a small on-device model as the verifier lane, and returns a compute receipt with every answer (which model ran, under which mode). The agent keeps those receipts per step and shows them on screen next to its own checks.
 
-The agent's own citation check: the explanation must cite at least one `ref` that the SQL tools actually returned and no other; otherwise it is replaced by the verifier's text, and the screen says so. A reply draft that promises money or misstates the verdict is replaced by a template.
-
-## How Cursor was used during development
-Cursor was the development environment for the repository (Cursor app and `cursor-agent` CLI). Project rules live in `.cursor/rules/project.mdc` (cite-or-fail, single SQL door, verifier decides, human approval for fixes, synthetic data only). Commits made through `cursor-agent` are marked `[cursor-agent]`. The developer reviewed every change; Cursor did not run fixes against any live system.
+- The agent refuses any model endpoint that is not on this machine unless `ALLOW_CLOUD_LLM=1`; Nightshift is that local endpoint, and what Nightshift may route to is the seller's choice in Nightshift (privacy floor: local-only / cloud-ok).
+- Before any row reaches the model, the sender's address becomes `CUSTOMER`, other addresses keep only a first letter and the domain (so a typo like `exmaple.com` stays visible), and card digits are removed.
 
 ## Where NVIDIA technology contributes
-NVIDIA Nemotron 3.5 Lightning (OpenMDW-1.1) is the explaining model, run locally (Meterless Nightshift; a rapid-mlx build is kept as a second local runtime). It is used where a language model adds value — explanation, reply, fix wording — and deliberately not where it would add risk: the verdict about which link broke is computed deterministically from the cited rows.
+NVIDIA Nemotron does two jobs, and decides neither the verdict nor the fix:
+1. **Investigates.** Given the customer's message, it chooses which read-only tool to call next (find the customer's orders, find payments made by their address, find the order behind a payment, pull a full journey). Case 6 — paid with one address, ordered under a typo of it — is found this way in four tool calls; no rule in the verifier knows that case. The tools only follow the sender's own trail, so a crafted message cannot pull another customer's records.
+2. **Explains and drafts.** It writes the explanation (which must cite the rows it used, or it is replaced by the verifier's text) and the reply to the customer, in the customer's language; a reply that promises money is replaced by a template.
 
-## What was unique about the use of the sponsor technologies
-- Zetaris is used as the *evidence layer*, not as a data warehouse: the agent's output is a chain of raw rows, and Zetaris is what makes those rows reachable in one query across four systems.
-- Meterless is used as the *privacy boundary*: the only reason a seller can paste a real customer message into this tool is that the model runs locally.
-- The model is not allowed to decide. It explains a verdict it cannot change and must cite rows it did not invent — the citation check makes that enforceable rather than aspirational.
-- The agent can say "nothing is broken": case 5 ends the demo with a grey chain and "You were never charged."
+Measured (`docs/measurements.md`): through Nightshift → Nemotron 3.5 Lightning (hosted NIM, free trial key), 6/6 cases resolved to the right order and broken link and 6/6 explanations passed the citation check, 65–115 s per case on the free endpoint. The same pipeline also runs fully offline on the Mac with Nemotron 3.5 Lightning 30B 4-bit through rapid-mlx (5/5 and 5/5, ~14 s per case).
 
-## Pre-existing components
-None. No product code from our existing services was reused; open-source libraries only (`requirements.txt`).
+## How Cursor was used
+The repository was developed with Cursor's agent (`cursor-agent`) alongside hand-written code. Project rules live in `.cursor/rules/project.mdc` (cite-or-fail, single SQL door, verifier decides, human approval for fixes, synthetic data only). Commits made through Cursor are marked `[cursor-agent]`, and the session outputs are saved in `docs/cursor-sessions/` (UI overhaul, approve-and-fix with audit log, Korean replies, Nightshift receipts on screen, the how-it-works strip, the result layout). Every Cursor change was reviewed and tested before it was committed.
+
+## What was unique
+- The agent can say "nothing is broken — you were never charged", and proves it.
+- The model investigates, but a deterministic verifier decides; every red link carries the rows that prove it.
+- A human approves every fix; every approved fix is written to an audit log; a fix that would move credits to another address first asks for the customer's confirmation.
+- The cases are incidents from our own small shop, rebuilt with synthetic data.
