@@ -1,39 +1,81 @@
--- Zetaris Lightning SQL — one statement per call (run via the JDBC driver or the SQL editor).
--- Registers the five synthetic sources and builds the `order_journey` semantic layer.
+-- Zetaris Lightning SQL — run ONE statement per call (JDBC) or paste into the SQL editor.
+-- Registers the five synthetic sources and builds the `order_journey` unified semantic layer.
+-- Syntax per https://zetaris.github.io/getting-started/docs/guides/zetaris-lightning-sql-commands.html
 --
 -- Source layout for the local Docker platform: the synthetic CSVs are loaded into a `demo`
--- database on the bundled Postgres (see zetaris/load_postgres.sh). Zetaris reads them in
--- place over JDBC; nothing is copied into Zetaris. In production each source would be its
--- own system: the PSP ledger (REST), the app database (Postgres), log exports (files on S3),
--- the mail provider (REST) — same SQL for the agent either way.
+-- database on the bundled Postgres (zetaris/load_postgres.sh). Zetaris reads them in place
+-- over JDBC; nothing is copied into Zetaris. In production each source is its own system
+-- (PSP ledger REST, app database, log exports on S3, mail-provider REST) — same SQL for the agent.
 
-CREATE DATASOURCE demo_pg DESCRIBE BY "synthetic seller sources (payments, orders, grants, server_logs, mail_events)"
-OPTIONS (
+-- 1. datasource (administrator)
+CREATE DATASOURCE demo_pg DESCRIBE BY "synthetic seller sources: payments, orders, grants, server_logs, mail_events" OPTIONS (
   jdbcdriver "org.postgresql.Driver",
   jdbcurl "jdbc:postgresql://postgres:5432/demo",
   username "zetaris",
-  password "${POSTGRES_PASSWORD}"
+  password "${POSTGRES_PASSWORD}",
+  fetchsize "1000"
 );
 
 REGISTER DATASOURCE TABLES FROM demo_pg;
 
--- Unified Semantic Layer: how the five tables relate (the keys the agent joins on).
-COMPILE USL IF NOT EXISTS order_journey DDL
-  CREATE TABLE orders (order_id string, payment_id string, email string, reward_key string, amount string, status string, credited string, created_at string, updated_at string, CONSTRAINT pk_orders PRIMARY KEY (order_id));
-  CREATE TABLE payments (payment_id string, amount string, currency string, status string, card_last4 string, customer_email string, created_at string, CONSTRAINT pk_payments PRIMARY KEY (payment_id), CONSTRAINT fk_pay_order FOREIGN KEY (payment_id) REFERENCES orders(payment_id));
-  CREATE TABLE grants (grant_id string, email string, reward_key string, credits string, status string, order_id string, created_at string, CONSTRAINT pk_grants PRIMARY KEY (grant_id), CONSTRAINT fk_grant_order FOREIGN KEY (order_id) REFERENCES orders(order_id));
-  CREATE TABLE server_logs (ts string, route string, order_id string, http_status string, message string, CONSTRAINT fk_log_order FOREIGN KEY (order_id) REFERENCES orders(order_id));
-  CREATE TABLE mail_events (email_id string, "to" string, event string, ts string, tag string, CONSTRAINT fk_mail_order FOREIGN KEY (tag) REFERENCES orders(order_id));
+-- 2. namespace + semantic layer (send the whole COMPILE statement in one piece)
+CREATE NAMESPACE IF NOT EXISTS lightning.metastore.demo;
 
-ACTIVATE USL TABLE order_journey.orders AS SELECT * FROM demo_pg.orders;
-ACTIVATE USL TABLE order_journey.payments AS SELECT * FROM demo_pg.payments;
-ACTIVATE USL TABLE order_journey.grants AS SELECT * FROM demo_pg.grants;
-ACTIVATE USL TABLE order_journey.server_logs AS SELECT * FROM demo_pg.server_logs;
-ACTIVATE USL TABLE order_journey.mail_events AS SELECT * FROM demo_pg.mail_events;
+COMPILE USL order_journey DEPLOY NAMESPACE lightning.metastore.demo DDL
+CREATE TABLE orders (
+  order_id varchar(32) NOT NULL PRIMARY KEY,
+  payment_id varchar(32),
+  email varchar(200),
+  reward_key varchar(32),
+  amount varchar(16),
+  status varchar(16),
+  credited varchar(4),
+  created_at varchar(32),
+  updated_at varchar(32)
+);
+CREATE TABLE payments (
+  payment_id varchar(32) NOT NULL PRIMARY KEY,
+  amount varchar(16),
+  currency varchar(8),
+  status varchar(16),
+  card_last4 varchar(4),
+  customer_email varchar(200),
+  created_at varchar(32)
+);
+CREATE TABLE grants (
+  grant_id varchar(48) NOT NULL PRIMARY KEY,
+  email varchar(200),
+  reward_key varchar(32),
+  credits varchar(8),
+  status varchar(16),
+  order_id varchar(32) FOREIGN KEY REFERENCES orders(order_id),
+  created_at varchar(32)
+);
+CREATE TABLE server_logs (
+  ts varchar(32) NOT NULL PRIMARY KEY,
+  route varchar(64),
+  order_id varchar(32) FOREIGN KEY REFERENCES orders(order_id),
+  http_status varchar(4),
+  message varchar(200)
+);
+CREATE TABLE mail_events (
+  email_id varchar(48) NOT NULL PRIMARY KEY,
+  "to" varchar(200),
+  event varchar(16),
+  ts varchar(32),
+  tag varchar(32) FOREIGN KEY REFERENCES orders(order_id)
+)
 
--- Smoke test: the join the agent relies on.
+-- 3. activate each table from the registered source
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.orders AS SELECT COALESCE(order_id,'') AS order_id, payment_id, email, reward_key, amount, status, credited, created_at, updated_at FROM demo_pg.orders;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.payments AS SELECT COALESCE(payment_id,'') AS payment_id, amount, currency, status, card_last4, customer_email, created_at FROM demo_pg.payments;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.grants AS SELECT COALESCE(grant_id,'') AS grant_id, email, reward_key, credits, status, order_id, created_at FROM demo_pg.grants;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.server_logs AS SELECT COALESCE(ts,'') AS ts, route, order_id, http_status, message FROM demo_pg.server_logs;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.mail_events AS SELECT COALESCE(email_id,'') AS email_id, "to", event, ts, tag FROM demo_pg.mail_events;
+
+-- 4. smoke test — the join the agent relies on. The agent sets ZETARIS_SCHEMA=lightning.metastore.demo.order_journey
 SELECT o.order_id, o.status, p.status AS psp_status, g.grant_id
-FROM order_journey.orders o
-LEFT JOIN order_journey.payments p ON p.payment_id = o.payment_id
-LEFT JOIN order_journey.grants g ON g.order_id = o.order_id
+FROM lightning.metastore.demo.order_journey.orders o
+LEFT JOIN lightning.metastore.demo.order_journey.payments p ON p.payment_id = o.payment_id
+LEFT JOIN lightning.metastore.demo.order_journey.grants g ON g.order_id = o.order_id
 WHERE o.order_id IN ('ord_0901','ord_0902','ord_0903','ord_0904','ord_0905');
