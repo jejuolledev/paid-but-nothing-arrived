@@ -43,7 +43,7 @@ Green until the link that broke. Click the link → the raw row that proves it. 
 2. `order_journey` — one SQL query to Zetaris across five tables
 3. deterministic verifier: each link green / red / grey, with refs
 4. Nemotron (local, via Nightshift) explains, drafts the reply, phrases the fix
-5. citation check: every sentence must cite a returned `ref`, or it is rejected
+5. citation check: the explanation must cite returned `ref`s and may cite nothing else, or it is replaced by the verifier's text
 
 ---
 
@@ -63,9 +63,8 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # How Meterless + NVIDIA were used
 
-- Nightshift serves Nemotron locally at an OpenAI-compatible address → customer data stays on the machine.
+- Nightshift serves Nemotron locally at an OpenAI-compatible address; remote endpoints are refused by default and identity fields are redacted before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Nightshift run trace shown as "checks on the record" next to our citation check.
 - Measured: 5 seeded cases → correct link 5/5, citation check 5/5, ~14 s per case on a laptop.
 
 ---
@@ -84,4 +83,4 @@ All data synthetic. The five cases are bugs we found in our own checkout — two
 - Real PSP connectors (Stripe, PortOne) and mail providers as Zetaris REST sources
 - Screenshot reading (receipt / card SMS) with a local vision model
 - Installable edition for sellers; Korean UI
-- Cursor: rules + agent sessions in the repo
+- Cursor: project rules in .cursor/rules

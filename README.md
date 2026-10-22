@@ -57,15 +57,20 @@ Paste a customer message (or click a seeded case). The result page shows the cha
 ## Sponsor technologies
 See `docs/sponsor-tech.md` for the full write-up.
 - **Zetaris** — the one SQL door. Payments, orders, grants, server logs and mail events are registered as sources and joined in a unified semantic layer `order_journey`; the agent only ever sends SQL to Zetaris.
-- **Meterless Nightshift** — local OpenAI-compatible runtime for Nemotron. Customer messages and rows never leave the machine; Nightshift's run trace is shown next to the verdict.
+- **Meterless Nightshift** — local OpenAI-compatible runtime for Nemotron. The agent refuses non-local model endpoints unless `ALLOW_CLOUD_LLM=1`, and customer identity fields (email, card last 4, mail address) are removed before rows reach the model.
 - **NVIDIA Nemotron 3.5 Lightning** — the explaining model (local, OpenMDW-1.1 license).
-- **Cursor** — development; see `docs/sponsor-tech.md` and `docs/cursor-sessions/`.
+- **Cursor** — development; see `docs/sponsor-tech.md`.
 
 ## Measured
 On an Apple-silicon laptop with the local Zetaris platform (Docker, emulated) and NVIDIA Nemotron 3.5 Lightning 30B (4-bit, local): the five seeded cases resolve to the correct link **5/5**, the model's explanations pass the citation check **5/5**, about **14 s per case** end to end (`docs/measurements.md`, `scripts/llm_smoke.py`). The verifier alone answers in ~20 ms on DuckDB and ~9 s through Zetaris.
 
 ## Pre-existing components
 None of our product code. Open-source libraries only (`requirements.txt`). Everything in this repository was written during the build window.
+
+## Privacy and safety
+- Seller-side tool: it reads only the seller's own merchant records (PSP ledger, orders, grants, server logs, mail events). It never touches a customer's card issuer or bank. Run it on the seller's machine (`--host 127.0.0.1`, the default); the API has no login and is not meant to be exposed.
+- Only well-formed ids (`ord_0000`, an email address) reach SQL; anything else is refused.
+- The model never decides: the verdict and the fix come from the verifier; the model writes the explanation (citation-checked) and the reply draft, which is replaced by a template if it promises money or misstates the verdict.
 
 ## Limitations
 - The verifier covers the five link types we have seen; new failure shapes land in "not verified" rather than being guessed.

@@ -32,24 +32,25 @@ ul{margin:6px 0;padding-left:18px}.tag{display:inline-block;font-size:12px;borde
 </main>
 <script>
 const $=s=>document.querySelector(s);
-async function loadCases(){const cs=await (await fetch('/api/cases')).json();$('#samples').innerHTML='<span class="mut">Seeded cases:</span> '+cs.map(c=>`<button class="ghost" data-id="${c.order_id}">${c.case}. ${c.title}</button>`).join('');
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+async function loadCases(){const cs=await (await fetch('/api/cases')).json();$('#samples').innerHTML='<span class="mut">Seeded cases:</span> '+cs.map(c=>`<button class="ghost" data-id="${c.order_id}">${esc(c.case)}. ${esc(c.title)}</button>`).join('');
   document.querySelectorAll('#samples button').forEach(b=>b.onclick=()=>{$('#msg').value=`Hi, I paid but nothing arrived. My order is ${b.dataset.id}.`;run();});}
 async function run(){const message=$('#msg').value.trim();if(!message)return;$('#status').textContent='investigating…';$('#go').disabled=true;
   const r=await (await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})})).json();
   $('#go').disabled=false;$('#status').textContent=r.ok?`${r.elapsed_ms} ms · backend ${r.backend} · model ${r.llm}`:'';render(r);}
-function render(r){if(!r.ok){$('#out').innerHTML=`<div class="card"><div class="headline">${r.headline}</div></div>`;return;}
-  const chain=r.chain.map((l,i)=>`<div class="link ${l.state}" data-i="${i}"><b>${l.label}</b><small>${l.note}</small>${l.refs.length?`<small class="mut">${l.refs.length} row${l.refs.length>1?'s':''} ↗</small>`:''}</div>`).join('');
+function render(r){if(!r.ok){$('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div></div>`;return;}
+  const chain=r.chain.map((l,i)=>`<div class="link ${l.state}" data-i="${i}"><b>${esc(l.label)}</b><small>${esc(l.note)}</small>${l.refs.length?`<small class="mut">${l.refs.length} row${l.refs.length>1?'s':''} ↗</small>`:''}</div>`).join('');
   const cited=new Set(r.chain.flatMap(l=>l.refs));
-  const rows=Object.entries(r.rows).map(([t,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${t} <span class="tag">${rs.length}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${k}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${CSS.escape(x.ref)}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${v??''}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
-  $('#out').innerHTML=`<div class="card"><div class="headline">${r.headline}</div><div class="mut">order ${r.order_id} · ${r.email}</div><div class="chain">${chain}</div></div>
-  <div class="card two"><div><h2>Why</h2><p>${r.explanation.replace(/\[([a-z_]+:[^\]]+)\]/g,'<a href="#row-$1" style="color:var(--acc)">[$1]</a>')}</p>
-   <h2>Verified</h2><ul>${r.verified.map(v=>`<li>${v}</li>`).join('')}</ul><h2>Not verified</h2><ul>${r.unverified.map(v=>`<li>${v}</li>`).join('')||'<li class="mut">—</li>'}</ul>
+  const rows=Object.entries(r.rows).map(([t,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${t} <span class="tag">${rs.length}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${CSS.escape(x.ref)}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
+  $('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div><div class="chain">${chain}</div></div>
+  <div class="card two"><div><h2>Why</h2><p>${esc(r.explanation).replace(/\[([a-z_]+:[^\]]+)\]/g,'<a href="#row-$1" style="color:var(--acc)">[$1]</a>')}</p>
+   <h2>Verified</h2><ul>${r.verified.map(v=>`<li>${esc(v)}</li>`).join('')}</ul><h2>Not verified</h2><ul>${r.unverified.map(v=>`<li>${esc(v)}</li>`).join('')||'<li class="mut">—</li>'}</ul>
    <p class="mut" style="font-size:12px">Citation check: ${r.citation_check.checked?(r.citation_check.ok?'passed':'failed → verifier text used'):'model step skipped (no endpoint)'}</p></div>
-  <div><h2>Next actions</h2><h3 style="font-size:14px;margin:8px 0 4px">Reply to the customer</h3><pre>${r.customer_reply}</pre>
-   <h3 style="font-size:14px;margin:8px 0 4px">Fix <span class="tag">needs your approval</span></h3><pre>${r.fix_action}</pre>
+  <div><h2>Next actions</h2><h3 style="font-size:14px;margin:8px 0 4px">Reply to the customer</h3><pre>${esc(r.customer_reply)}</pre>
+   <h3 style="font-size:14px;margin:8px 0 4px">Fix <span class="tag">needs your approval</span></h3><pre>${esc(r.fix_action)}</pre>
    <button class="ghost" onclick="evidence()">Dispute evidence bundle</button></div></div>
   <div class="card rows"><h2>Raw rows (cited rows highlighted)</h2>${rows}</div>
-  <div class="card"><h2>Trace</h2><ul>${r.trace.map(t=>`<li><b>${t.step}</b> — ${t.detail} <span class="mut">${t.ms} ms</span></li>`).join('')}</ul></div>`;
+  <div class="card"><h2>Trace</h2><ul>${r.trace.map(t=>`<li><b>${esc(t.step)}</b> — ${esc(t.detail)} <span class="mut">${t.ms} ms</span></li>`).join('')}</ul></div>`;
   document.querySelectorAll('.link').forEach(el=>el.onclick=()=>{const l=r.chain[el.dataset.i];if(l.refs[0]){const row=document.getElementById('row-'+l.refs[0]);if(row)row.scrollIntoView({behavior:'smooth',block:'center'});}});}
 async function evidence(){const message=$('#msg').value.trim();const t=await (await fetch('/api/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})})).text();const w=window.open('','_blank');w.document.write('<pre style="white-space:pre-wrap;font:13px/1.5 monospace;padding:20px">'+t.replace(/</g,'&lt;')+'</pre>');}
 $('#go').onclick=run;loadCases();

@@ -37,11 +37,22 @@ def _client():
         base = "https://openrouter.ai/api/v1"
     if not base:
         return None, None
+    # Customer rows stay on this machine unless the operator explicitly opts in to a remote model.
+    if not re.match(r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(/|$)", base) and os.getenv("ALLOW_CLOUD_LLM") != "1":
+        return None, None
     from openai import OpenAI
     return OpenAI(base_url=base, api_key=key or "local"), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
 
 
 REF_RE = re.compile(r"(?:payments|orders|grants|server_logs|mail_events):[A-Za-z0-9_./@:+-]+")
+
+
+PII_FIELDS = {"email", "customer_email", "to_address", "card_last4"}
+
+
+def _redact(journey: dict) -> dict:
+    """What the model sees: same rows and refs, without who the customer is."""
+    return {t: [{k: ("<redacted>" if k in PII_FIELDS else v) for k, v in r.items()} for r in rows] for t, rows in journey.items()}
 
 
 def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
@@ -61,9 +72,13 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
         trace.append(Trace(step, detail, int((time.time() - t0) * 1000)))
 
     # 1. locate the order (email or order id; fall back to an id mentioned in the message)
+    if order_id and not re.fullmatch(r"ord_\d{4}", order_id): order_id = ""
+    if email and not re.fullmatch(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", email): email = ""
     if not order_id and not email:
         m = re.search(r"ord_\d{4}", message); order_id = m.group(0) if m else ""
-        m = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", message); email = m.group(0) if m else email
+        m = re.search(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", message); email = m.group(0) if m else email
+    if not order_id and not email:
+        return {"ok": False, "headline": "Add the order number (ord_0000) or the customer's email to the message.", "trace": [], "backend": db.name}
     orders = tools.find_orders(email=email, order_id=order_id)
     mark("find_orders", f"{len(orders)} order(s) for {order_id or email}")
     if not orders:
@@ -83,10 +98,11 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
         try:
             resp = client.chat.completions.create(model=model, temperature=0.2, response_format={"type": "json_object"},
                 messages=[{"role": "system", "content": SYSTEM},
-                          {"role": "user", "content": json.dumps({"customer_message": message, "chain": verdict.to_dict(), "rows": journey}, default=str)}])
+                          {"role": "user", "content": json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(), "rows": _redact(journey)}, default=str)}])
             texts = json.loads(resp.choices[0].message.content); llm_used = model
             texts["_raw_explanation"] = texts.get("explanation", "")
             ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
+            texts["fix_action"] = verdict.suggested_fix  # the fix is decided by the verifier, never by the model
             if not _reply_ok(texts.get("customer_reply", ""), verdict):
                 texts["customer_reply"] = _template_reply(verdict); citation["reply_replaced"] = True
             if not ok:
@@ -117,6 +133,8 @@ def _reply_ok(reply: str, v) -> bool:
     """The reply must be the seller speaking and must carry the verdict; otherwise the template is safer."""
     if not reply or re.search(r"\b(let me check my account|you gave me|my order|my credits)\b", reply, re.I):
         return False
+    if re.search(r"refund|compensat|discount|free|voucher|환불|보상|할인|무료", reply, re.I):
+        return False  # the model may not promise money; a person decides that
     key = v.broken if v.broken in REPLY_MUST else None
     if key is None and "never charged" not in v.headline.lower() and v.broken is None:
         return bool(re.search(r"in your account|went through|everything", reply, re.I))
