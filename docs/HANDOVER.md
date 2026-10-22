@@ -41,7 +41,12 @@
 ### NVIDIA (특별상)
 - 모델: Nemotron 3.5 Lightning(로컬) — Nightshift 또는 rapid-mlx. 클라우드 예비: OpenRouter `nvidia/nemotron-3.5-lightning:free`(키 없음, 대표 가입 필요 — 없어도 됨).
 
-## 2. 남은 제출물 (규정 6절)
+## 2. 남은 제출물 (규정 6절) — 11:20 현재 초안 전부 있음
+- ✅ 영상 `docs/demo/final.mp4` 2분 40초(제목 카드 14초 + Zetaris 백엔드 워크스루 2분 10초 + 구조 카드 16초, 무음·자막 배너). 만드는 법: `node scripts/record_demo.mjs && bash scripts/build_video.sh`. Nightshift 연동 후 한 번 더 돌리면 「model …」 칸이 채워진 최종본.
+- ✅ 슬라이드 `docs/slides.pdf`(marp, 10장) ← `docs/slides.md`. 제품 화면 장에는 `docs/demo/case-*.png`를 넣으면 더 좋음(지금은 글만).
+- ✅ 저장소(비공개) + README · ✅ `docs/sponsor-tech.md` · ✅ `docs/submission_form.md`(폼에 붙일 값).
+- ⏳ 남은 것: Nightshift 연동(대표가 앱 켜면) → `.env.local` NIGHTSHIFT_* → `scripts/llm_smoke.py`로 수치 → 영상·README 「model」 반영 / Cursor 로그인 뒤 cursor-agent로 마무리 작업 1~2건 + `docs/cursor-sessions/` / 유튜브 업로드(대표) / 저장소 공개 전환 / 폼 제출.
+
 1. 데모 영상 1~4분(영어 자막) — 대본 뼈대: `지원사업제출/0_해커톤_안낸것/01 Open Agent…/문서_md/11_착수계획_6일.md` 5절. 화면 녹화는 headless(playwright) 캡처 또는 QuickTime(대표).
 2. 슬라이드 10장 — 같은 문서 6절 목차. `docs/slides.md` → PDF.
 3. GitHub 공개 저장소 + README(설치·사용·의존성·합성 데이터 선언·후원사 기술·pre-existing 없음) — `gh repo create` 계정 jejuolledev.
