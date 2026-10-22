@@ -39,7 +39,7 @@
 - 로그인 뒤: 남은 작업(JDBC 백엔드·Nightshift 연동·README 다듬기)을 `cursor-agent -p "<지시>"`로 시켜 커밋 메시지 끝에 `[cursor-agent]` 표시, 대화 기록을 `docs/cursor-sessions/`에 저장. 설명문의 「How Cursor was used」 근거.
 - 규칙 파일 `.cursor/rules/project.mdc` 있음.
 ### NVIDIA (특별상) — 로컬 Nemotron 1차 측정 완료(10:37)
-- rapid-mlx `nemotron-3.5-lightning-30b-4bit`(포트 8197, 영상 세션 slot 안에서 2분): **판정 5/5(verifier), 모델 응답 평균 12.9초, 인용 검사 1/5 통과** — 모델이 `[ref: orders:…]`·맨몸 ref로 써서 파서가 못 잡은 것. 파서·프롬프트 고침(커밋 「Citation check accepts…」). **2차 측정 대기**: 감시 스크립트 재가동(slot_open 생기면 자동, 결과 `docs/nemotron_slot_run.log`·`docs/measurements.md`). 2차에서 4/5 이상이면 README·슬라이드에 수치 넣기.
+- rapid-mlx `nemotron-3.5-lightning-30b-4bit`(포트 8197, 영상 세션 slot 안에서 2분): **판정 5/5(verifier), 모델 응답 평균 12.9초, 인용 검사 1/5 통과** — 모델이 `[ref: orders:…]`·맨몸 ref로 써서 파서가 못 잡은 것. 파서·프롬프트 고침(커밋 「Citation check accepts…」). **2차 측정 완료(10:48): 판정 5/5 · 인용 검사 5/5 · 평균 14.0초** → README 「Measured」·슬라이드 8장에 반영함. 고객 답장이 사례 3·5에서 고객 말투로 새는 문제 → 프롬프트 보강 + 답장 검사(어긋나면 템플릿으로 교체, `citation_check.reply_replaced`) 추가. 감시 스크립트는 종료됨(다시 쓰려면 scratchpad/nemotron_slot.sh).
 - Nightshift가 켜지면 `.env.local`에 `NIGHTSHIFT_BASE_URL=http://127.0.0.1:8088/v1`, `NIGHTSHIFT_API_KEY=rt-local`, `LLM_MODEL=meterless/local`(또는 Nightshift 모델 목록의 Nemotron 이름)로 바꾸고 같은 smoke 스크립트 → 이게 제출 기준 수치(Meterless 필수 연동).
 - 모델: Nemotron 3.5 Lightning(로컬) — Nightshift 또는 rapid-mlx. 클라우드 예비: OpenRouter `nvidia/nemotron-3.5-lightning:free`(키 없음, 대표 가입 필요 — 없어도 됨).
 
