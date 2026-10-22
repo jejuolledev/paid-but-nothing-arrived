@@ -68,9 +68,9 @@ See `docs/sponsor-tech.md` for the full write-up.
 
 ## Measured
 `docs/measurements.md`, `scripts/llm_smoke.py`, synthetic data, six seeded cases (case 6 is outside the verifier's playbook and only gives the payer's address):
-- **Through Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted, free trial key):** correct order and broken link **6/6**, explanation citation check **6/6**; case 6 solved by the model-driven loop in 4 tool calls. About 65–115 s per case on the free endpoint.
-- **Fully offline (Nemotron 3.5 Lightning 30B 4-bit on the Mac, rapid-mlx):** 5/5 and 5/5, about 14 s per case.
-- Verifier alone: ~20 ms on DuckDB, ~9 s through the local Zetaris platform.
+- **Final code, 2026-10-23 03:34, through Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted endpoint, free trial key):** right order and broken link **6/6**; explanation citation check **6/6**; the model-driven loop itself named the right order **5/6** (case 5 hit the step limit and the plain lookup found it); the model's reply was kept **5/6** (one replaced by the template); a message quoting another customer's order number was **blocked**. 74–218 s per case on the free endpoint (avg 111 s).
+- Cases 1–5 are within the verifier's playbook, so their verdict does not depend on the model; case 6 (payer address only, order under a typo) needs the loop.
+- An earlier five-case version without the loop also ran fully on the Mac (Nemotron 3.5 Lightning 30B 4-bit, rapid-mlx): 5/5 and 5/5, about 14 s per case.
 
 ## Pre-existing components
 None of our product code. Open-source libraries only (`requirements.txt`). Everything in this repository was written during the build window.

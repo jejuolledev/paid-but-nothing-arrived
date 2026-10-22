@@ -153,6 +153,7 @@ const I18N={
     how4d:'the chain turns green; every fix is logged',
     fixedByYou:'Fixed by you',
     sendAfterFix:'Send this after the fix:',
+    sendAfterApprove:'Send this only after you approve the fix below.',
     before:'Before',
     after:'After',
     actionId:'Action',
@@ -212,6 +213,7 @@ const I18N={
     how4d:'연결고리가 초록으로 바뀌고, 모든 수정은 기록됩니다',
     fixedByYou:'직접 수정함',
     sendAfterFix:'수정 후 보낼 답장:',
+    sendAfterApprove:'아래 수정을 승인한 뒤에만 보내세요.',
     before:'이전',
     after:'이후',
     actionId:'액션',
@@ -462,7 +464,7 @@ function render(r, opts){
   const fixTag=needsFix
     ?`<span class="tag warn">${esc(i.needsApproval)}</span>`
     :`<span class="tag ok">${esc(i.noFixNeeded)}</span>`;
-  const replyNote=afterFix?`<p class="reply-note">${esc(i.sendAfterFix)}</p>`:'';
+  const replyNote=afterFix?`<p class="reply-note">${esc(i.sendAfterFix)}</p>`:(needsFix?`<p class="reply-note">${esc(i.sendAfterApprove)}</p>`:'');
 
   $('#out').innerHTML=`
   ${renderFixCard()}
