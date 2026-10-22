@@ -21,8 +21,10 @@ from agent.investigator import investigate  # noqa: E402
 cases = json.loads((ROOT / "data/out/cases.json").read_text())
 rows, t0 = [], time.time()
 for c in cases:
-    r = investigate(f"Hi, I paid but nothing arrived. My order is {c['order_id']}.")
-    rows.append(dict(case=c["case"], verdict_ok=r["broken"] == c["broken_link"], llm=r["llm"],
+    # case 6 is the one outside the verifier's playbook: the customer only gives the address they paid with
+    msg = (f"Hi, I paid but nothing arrived. {c['email']}" if c["case"] == 6 else f"Hi, I paid but nothing arrived. My order is {c['order_id']}.")
+    r = investigate(msg)
+    rows.append(dict(case=c["case"], verdict_ok=r.get("broken") == c["broken_link"] and r.get("order_id") == c["order_id"], llm=r.get("llm"), agent_steps=len(r.get("steps", [])),
                      citations=r["citation_check"], ms=r["elapsed_ms"], reply_len=len(r["customer_reply"])))
     print("   explanation:", r["explanation"][:300].replace("\n", " "))
     print("   reply:", r["customer_reply"][:200].replace("\n", " "))

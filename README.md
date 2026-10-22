@@ -62,7 +62,10 @@ See `docs/sponsor-tech.md` for the full write-up.
 - **Cursor** — development; see `docs/sponsor-tech.md`.
 
 ## Measured
-On an Apple-silicon laptop with the local Zetaris platform (Docker, emulated) and NVIDIA Nemotron 3.5 Lightning 30B (4-bit, local): the five seeded cases resolve to the correct link **5/5**, the model's explanations pass the citation check **5/5**, about **14 s per case** end to end (`docs/measurements.md`, `scripts/llm_smoke.py`). The verifier alone answers in ~20 ms on DuckDB and ~9 s through Zetaris.
+`docs/measurements.md`, `scripts/llm_smoke.py`, synthetic data, six seeded cases (case 6 is outside the verifier's playbook and only gives the payer's address):
+- **Through Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted, free trial key):** correct order and broken link **6/6**, explanation citation check **6/6**; case 6 solved by the model-driven loop in 4 tool calls. About 65–115 s per case on the free endpoint.
+- **Fully offline (Nemotron 3.5 Lightning 30B 4-bit on the Mac, rapid-mlx):** 5/5 and 5/5, about 14 s per case.
+- Verifier alone: ~20 ms on DuckDB, ~9 s through the local Zetaris platform.
 
 ## Pre-existing components
 None of our product code. Open-source libraries only (`requirements.txt`). Everything in this repository was written during the build window.

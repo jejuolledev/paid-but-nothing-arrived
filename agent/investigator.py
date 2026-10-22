@@ -30,9 +30,18 @@ class Trace:
     ms: int
 
 
+def _nightshift_key() -> str:
+    """Nightshift mints its Runtime API key into a file on this Mac; read it rather than copying it around."""
+    path = os.path.expanduser(os.getenv("NIGHTSHIFT_TOKEN_FILE", "~/Library/Application Support/ai.meterless.nightshift.m1m4/runtime-token"))
+    try:
+        return open(path).read().strip()
+    except OSError:
+        return ""
+
+
 def _client():
     base = os.getenv("NIGHTSHIFT_BASE_URL") or os.getenv("LLM_BASE_URL")
-    key = os.getenv("NIGHTSHIFT_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+    key = os.getenv("NIGHTSHIFT_API_KEY") or (os.getenv("NIGHTSHIFT_BASE_URL") and _nightshift_key()) or os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     if not base and os.getenv("OPENROUTER_API_KEY"):
         base = "https://openrouter.ai/api/v1"
     if not base:
@@ -41,7 +50,9 @@ def _client():
     if not re.match(r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(/|$)", base) and os.getenv("ALLOW_CLOUD_LLM") != "1":
         return None, None
     from openai import OpenAI
-    return OpenAI(base_url=base, api_key=key or "local"), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
+    # Nightshift keeps a policy per calling app; this name is the row the operator sees and binds.
+    headers = {"meterless-app": "paid-but-nothing-arrived"} if os.getenv("NIGHTSHIFT_BASE_URL") else None
+    return OpenAI(base_url=base, api_key=key or "local", default_headers=headers, timeout=180), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
 
 
 REF_RE = re.compile(r"(?:payments|orders|grants|server_logs|mail_events):[A-Za-z0-9_./@:+-]+")
@@ -126,12 +137,19 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
 
     # 4. explanation + reply + fix (LLM, citation-checked)
     texts, llm_used, citation = None, "none", {"checked": False}
+    receipts = [st.get("receipt") for st in steps]
     if client:
         try:
-            resp = client.chat.completions.create(model=model, temperature=0.2, response_format={"type": "json_object"},
+            resp = client.chat.completions.create(model=model, temperature=0.2, max_tokens=4000, reasoning_effort=os.getenv("LLM_REASONING", "none"),
                 messages=[{"role": "system", "content": SYSTEM},
                           {"role": "user", "content": _mask(json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(), "rows": _redact(journey, email), "investigation": loop_finding}, default=str), email)}])
-            texts = json.loads(resp.choices[0].message.content); llm_used = model
+            from .agent_loop import _parse
+            texts = _parse(resp.choices[0].message.content or "")
+            if not texts:
+                raise ValueError("model returned no JSON object")
+            llm_used = getattr(resp, "model", None) or model
+            from .agent_loop import meterless_receipt
+            receipts.append(meterless_receipt(resp))
             texts["_raw_explanation"] = texts.get("explanation", "")
             ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
             texts["fix_action"] = verdict.suggested_fix  # the fix is decided by the verifier, never by the model
@@ -152,7 +170,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             "chain": [{"name": l.name, "label": LABELS[l.name], "state": l.state, "note": l.note, "refs": l.refs} for l in verdict.links],
             "broken": verdict.broken, "verified": verdict.verified, "unverified": verdict.unverified,
             "explanation": texts["explanation"], "customer_reply": texts["customer_reply"], "fix_action": texts["fix_action"],
-            "rows": journey, "trace": [asdict(t) for t in trace], "steps": steps, "llm": llm_used, "citation_check": citation, "backend": db.name,
+            "rows": journey, "trace": [asdict(t) for t in trace], "steps": steps, "receipts": [r for r in receipts if r], "llm": llm_used, "citation_check": citation, "backend": db.name,
             "elapsed_ms": int((time.time() - t0) * 1000)}
 
 

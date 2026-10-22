@@ -11,7 +11,7 @@ becomes `CUSTOMER`, any other address keeps only its first letter and its domain
 `exmaple.com` stays visible), and card digits are dropped.
 """
 from __future__ import annotations
-import json, re, time
+import json, os, re, time
 
 MAX_STEPS = 6
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
@@ -64,6 +64,16 @@ class Aliaser:
         return self.customer if v == "CUSTOMER" else v
 
 
+def meterless_receipt(resp) -> dict | None:
+    """Meterless Nightshift attaches a compute receipt to every answer (which model actually ran,
+    under which mode). Keep it so the screen can show what ran — None when not routed through Nightshift."""
+    extra = getattr(resp, "model_extra", None) or {}
+    m = extra.get("meterless")
+    if not m:
+        return None
+    return {k: m.get(k) for k in ("receipt_id", "decision_id", "requested_model", "provider_model", "mode") if m.get(k)} | {"model": getattr(resp, "model", None)}
+
+
 def _parse(text: str) -> dict | None:
     m = re.search(r"\{.*\}", text or "", re.S)
     if not m:
@@ -90,8 +100,9 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
     steps, seen, seen_orders = [], set(), set()
     for _ in range(MAX_STEPS):
         t0 = time.time()
-        resp = client.chat.completions.create(model=model, temperature=0.1, messages=msgs)
+        resp = client.chat.completions.create(model=model, temperature=0.1, messages=msgs, max_tokens=3000, reasoning_effort=os.getenv("LLM_REASONING", "none"))
         text = resp.choices[0].message.content or ""
+        receipt = meterless_receipt(resp)
         act = _parse(text)
         if not act:
             steps.append({"thought": "(unreadable reply)", "ms": int((time.time() - t0) * 1000)})
@@ -100,7 +111,7 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
         if act.get("done"):
             oid = act.get("order_id", "")
             ok = oid in seen_orders
-            steps.append({"thought": act.get("thought", ""), "done": True, "order_id": oid, "ms": int((time.time() - t0) * 1000)})
+            steps.append({"thought": act.get("thought", ""), "done": True, "order_id": oid, "ms": int((time.time() - t0) * 1000), "receipt": receipt})
             return {"ok": ok, "order_id": oid if ok else "", "finding": act.get("finding", ""), "steps": steps, "seen_refs": sorted(seen)}
         name, args = act.get("tool", ""), act.get("args", {}) or {}
         try:
@@ -110,7 +121,7 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
             seen_orders.update(r["order_id"] for r in rows if r.get("order_id"))
             shown = {k: al.rows(v) for k, v in result.items()} if isinstance(result, dict) else al.rows(result)
             obs = json.dumps(shown, default=str)[:6000]
-            steps.append({"thought": act.get("thought", ""), "tool": name, "args": args, "rows": len(rows), "ms": int((time.time() - t0) * 1000)})
+            steps.append({"thought": act.get("thought", ""), "tool": name, "args": args, "rows": len(rows), "ms": int((time.time() - t0) * 1000), "receipt": receipt})
         except (KeyError, ValueError) as e:
             obs = f"error: {type(e).__name__} — check the tool name and arguments"
             steps.append({"thought": act.get("thought", ""), "tool": name, "args": args, "error": True, "ms": int((time.time() - t0) * 1000)})
