@@ -26,8 +26,10 @@ button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt
 .flash{animation:flashRow 1.5s ease}
 h2{font-size:18px;margin:0 0 6px}.headline{font-size:22px;font-weight:600}.mut{color:var(--mut)}
 pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;margin:0}
+.prose{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;margin:0;font:inherit;line-height:1.5}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:720px){.two{grid-template-columns:1fr}}
 ul{margin:6px 0;padding-left:18px}.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--mut);margin-left:6px;vertical-align:middle}
+.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.warn{color:var(--bad);border-color:var(--bad)}
 .rows{overflow-x:auto;-webkit-overflow-scrolling:touch}.rows table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
 .rows td,.rows th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
 .cited{background:rgba(255,77,79,.12)}
@@ -46,6 +48,10 @@ details{margin-top:14px}details>summary{cursor:pointer;font-size:18px;font-weigh
 .how-n{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--acc);background:#0c0e12;line-height:1}
 .how-step b{display:block;font-size:13px;font-weight:600;line-height:1.3}
 .how-step span{display:block;font-size:12px;color:var(--mut);margin-top:2px;line-height:1.35}
+.fix-card{border-color:var(--ok)}.fix-meta{font-size:13px;color:var(--mut);margin:4px 0}.fix-chains{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}@media(max-width:720px){.fix-chains{grid-template-columns:1fr}}
+.fix-chains .panel{border-radius:10px;padding:10px;border:2px solid var(--line)}.fix-chains .panel.before{border-color:var(--bad);background:rgba(255,77,79,.08)}.fix-chains .panel.after{border-color:var(--ok);background:rgba(46,204,113,.08)}
+.fix-chains .panel h3{font-size:13px;margin:0 0 8px;color:var(--mut)}.fix-chains .mini{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}@media(max-width:640px){.fix-chains .mini{grid-template-columns:repeat(2,1fr)}}
+.fix-chains .mini .link{min-height:64px;padding:6px;font-size:12px;cursor:default}.reply-note{font-size:12px;color:var(--mut);margin:0 0 6px}
 </style></head><body>
 <header>
   <div class="top"><h1 id="title"></h1><div class="lang" id="lang"></div></div>
@@ -69,6 +75,31 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 const slug=ref=>String(ref??'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 
+const CHAIN_LABEL_KO={
+  'Card authorized':'카드 승인',
+  'PSP ledger PAID':'PSP 원장 PAID',
+  'Order confirmed':'주문 확정',
+  'Credits granted':'크레딧 지급',
+  'Mail delivered':'메일 발송',
+};
+const HEADLINE_KO={
+  'No order found for this customer.':'이 고객의 주문을 찾지 못했습니다.',
+  'Nothing is broken. You were never charged.':'끊긴 곳 없음. 결제가 되지 않았습니다.',
+  'Paid, but the order was never confirmed.':'결제는 됐지만 주문이 확정되지 않았습니다.',
+  'Paid, but the credits went to a different account.':'결제는 됐지만 크레딧이 다른 계정으로 갔습니다.',
+  'Paid and confirmed, but credits were never granted.':'결제·확정됐지만 크레딧이 지급되지 않았습니다.',
+  'The customer received the credits twice.':'고객에게 크레딧이 두 번 지급됐습니다.',
+  'Everything went through. The credits are in the account.':'모두 정상입니다. 크레딧이 계정에 있습니다.',
+  'Credits were granted, but the customer was never told.':'크레딧은 지급됐지만 고객에게 안내되지 않았습니다.',
+};
+const TOOL_KO={
+  find_orders:'주문 찾기',
+  find_payments:'결제 기록 찾기',
+  order_for_payment:'결제의 주문 찾기',
+  order_journey:'전체 기록 보기',
+  related_orders:'같은 고객 다른 주문',
+};
+
 const I18N={
   en:{
     title:'Paid, but nothing arrived.',
@@ -87,6 +118,7 @@ const I18N={
     copied:'Copied',
     fix:'What to fix',
     needsApproval:'needs your approval',
+    noFixNeeded:'No fix needed',
     investigation:'How the agent found it',
     namedOrder:'Named order',
     chain:'Money chain',
@@ -99,7 +131,6 @@ const I18N={
     citationFail:'Citation check: failed → verifier text used',
     citationSkip:'Citation check: model step skipped (no endpoint)',
     evidenceBtn:'Dispute evidence bundle',
-    rows:'rows',
     ms:'ms',
     answeredBy:m=>'Answered by: '+m+' on this machine',
     templateExplain:'Explanation: template (no model connected)',
@@ -107,7 +138,6 @@ const I18N={
     dataLocal:'Data: local files',
     approveFix:'Approve fix',
     approving:'Applying fix…',
-    fixedNote:(id,by,ts)=>'Fixed and logged — audit '+id+', approved by '+by+' at '+ts,
     routedBy:(model,rid)=>'Routed by Meterless Nightshift → '+model+' · receipt '+rid,
     modelLabel:'model',
     howTitle:'How it works',
@@ -119,6 +149,12 @@ const I18N={
     how3d:'Nemotron via Meterless Nightshift picks what to check; emails masked',
     how4:'You approve the fix',
     how4d:'the chain turns green; every fix is logged',
+    fixedByYou:'Fixed by you',
+    sendAfterFix:'Send this after the fix:',
+    before:'Before',
+    after:'After',
+    actionId:'Action',
+    confirmAddress:'The customer must confirm the address they paid with. Did they confirm?',
   },
   ko:{
     title:'결제했는데 아무것도 안 왔어요.',
@@ -137,6 +173,7 @@ const I18N={
     copied:'복사됨',
     fix:'고칠 것',
     needsApproval:'승인 필요',
+    noFixNeeded:'수정 불필요',
     investigation:'에이전트가 찾은 과정',
     namedOrder:'지정한 주문',
     chain:'결제 연결고리',
@@ -149,7 +186,6 @@ const I18N={
     citationFail:'인용 검사: 실패 → 검증기 문구 사용',
     citationSkip:'인용 검사: 모델 단계 생략(엔드포인트 없음)',
     evidenceBtn:'분쟁용 근거 묶음',
-    rows:'행',
     ms:'ms',
     answeredBy:m=>'답변: '+m+' (이 기기)',
     templateExplain:'설명: 템플릿(연결된 모델 없음)',
@@ -157,7 +193,6 @@ const I18N={
     dataLocal:'데이터: 로컬 파일',
     approveFix:'수정 승인',
     approving:'수정 적용 중…',
-    fixedNote:(id,by,ts)=>'수정 완료·기록됨 — 감사 '+id+', 승인자 '+by+', '+ts,
     routedBy:(model,rid)=>'Meterless Nightshift 경유 → '+model+' · receipt '+rid,
     modelLabel:'모델',
     howTitle:'작동 방식',
@@ -169,6 +204,12 @@ const I18N={
     how3d:'Meterless Nightshift의 Nemotron이 확인할 항목을 고릅니다. 이메일은 가려집니다',
     how4:'수정은 당신이 승인합니다',
     how4d:'연결고리가 초록으로 바뀌고, 모든 수정은 기록됩니다',
+    fixedByYou:'직접 수정함',
+    sendAfterFix:'수정 후 보낼 답장:',
+    before:'이전',
+    after:'이후',
+    actionId:'액션',
+    confirmAddress:'고객이 결제한 이메일 주소가 맞다고 확인해 주셨나요?',
   }
 };
 
@@ -181,7 +222,7 @@ const EXAMPLES={
   6:{label:'I paid but nothing arrived — liam.patel906@example.com',send:'liam.patel906@example.com'},
 };
 
-let lang='en', lastResult=null, casesCache=[];
+let lang='en', lastResult=null, lastFix=null, casesCache=[];
 let howOpen=true, howSeenResult=false;
 
 function t(){return I18N[lang]||I18N.en;}
@@ -190,6 +231,29 @@ function loadLang(){
 }
 function saveLang(){
   try{localStorage.setItem('ui-lang',lang);}catch(_){}
+}
+
+function rowsLabel(n){
+  const c=Number(n);
+  if(lang==='ko')return c+'행';
+  return c===1?'1 row':c+' rows';
+}
+
+function trLabel(label){
+  if(lang!=='ko')return label;
+  return CHAIN_LABEL_KO[label]||label;
+}
+function trHeadline(h){
+  if(lang!=='ko')return h;
+  return HEADLINE_KO[h]||h;
+}
+function trTool(name){
+  if(lang!=='ko'||!name)return name;
+  return TOOL_KO[name]||name;
+}
+
+function dedupeCitations(text){
+  return String(text??'').replace(/(\[[a-z_]+:[^\]]+\])(?:\s*\1)+/gi,'$1');
 }
 
 function renderHow(){
@@ -219,7 +283,7 @@ function applyChrome(){
   $('#msg').placeholder=i.placeholder;
   $('#go').textContent=i.go;
   $('#lang').innerHTML=`<button type="button" class="ghost${lang==='en'?' on':''}" data-lang="en">EN</button><button type="button" class="ghost${lang==='ko'?' on':''}" data-lang="ko">한국어</button>`;
-  document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;saveLang();applyChrome();renderSamples();if(lastResult)render(lastResult);});
+  document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;saveLang();applyChrome();renderSamples();if(lastResult)render(lastResult,{scroll:false});});
   const eh=$('#empty-hint');
   if(eh.dataset.show==='1')eh.textContent=i.emptyHint;
   renderHow();
@@ -266,7 +330,7 @@ function goToRef(ref){
 }
 
 function linkifyExplain(text){
-  return esc(text).replace(/\[([a-z_]+:[^\]]+)\]/gi,(_,ref)=>`<a class="cite" href="#row-${esc(slug(ref))}" data-ref="${esc(ref)}">[${esc(ref)}]</a>`);
+  return esc(dedupeCitations(text)).replace(/\[([a-z_]+:[^\]]+)\]/gi,(_,ref)=>`<a class="cite" href="#row-${esc(slug(ref))}" data-ref="${esc(ref)}">[${esc(ref)}]</a>`);
 }
 
 function renderSamples(){
@@ -300,12 +364,14 @@ async function run(){
   hint.hidden=true;hint.dataset.show='';
   $('#status').textContent=i.investigating;
   $('#go').disabled=true;
+  lastFix=null;
   try{
     const res=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
     if(!res.ok){
       lastResult=null;
       hideHowAfterResult();
       $('#out').innerHTML=`<div class="card"><div class="headline">${esc(i.errHttp)}</div><p class="hint">${esc(i.emptyHint)}</p></div>`;
+      $('#out').scrollIntoView({behavior:'smooth',block:'start'});
       $('#status').textContent='';
       return;
     }
@@ -318,10 +384,19 @@ async function run(){
     lastResult=null;
     hideHowAfterResult();
     $('#out').innerHTML=`<div class="card"><div class="headline">${esc(i.errNetwork)}</div><p class="hint">${esc(i.emptyHint)}</p></div>`;
+    $('#out').scrollIntoView({behavior:'smooth',block:'start'});
     $('#status').textContent='';
   }finally{
     $('#go').disabled=false;
   }
+}
+
+function renderChain(chain, clickable){
+  const i=t();
+  return (chain||[]).map((l,idx)=>{
+    const attrs=clickable?` data-i="${esc(idx)}" tabindex="0" role="button"`:'';
+    return `<div class="link ${esc(l.state)}"${attrs}><b>${esc(trLabel(l.label))}</b><small>${esc(l.note)}</small>${l.refs.length?`<small class="mut">${esc(rowsLabel(l.refs.length))} ↗</small>`:''}</div>`;
+  }).join('');
 }
 
 function renderSteps(steps){
@@ -331,7 +406,7 @@ function renderSteps(steps){
     const bits=[`<div>${esc(s.thought||'')}</div>`];
     if(s.tool){
       const args=s.args!=null?(typeof s.args==='string'?s.args:JSON.stringify(s.args)):'';
-      bits.push(`<div class="tool">${esc(s.tool)}${args?` ${esc(args)}`:''}${s.rows!=null?` · ${esc(s.rows)} ${esc(i.rows)}`:''}${s.error?' · error':''}</div>`);
+      bits.push(`<div class="tool">${esc(trTool(s.tool))}${args?` ${esc(args)}`:''}${s.rows!=null?` · ${esc(rowsLabel(s.rows))}`:''}${s.error?' · error':''}</div>`);
     }
     if(s.receipt){
       const m=s.receipt.model||s.receipt.provider_model||s.receipt.requested_model||'';
@@ -344,32 +419,54 @@ function renderSteps(steps){
   return `<div class="card"><h2>${esc(i.investigation)}</h2><ol class="timeline">${items}</ol></div>`;
 }
 
-function render(r, auditNote){
+function renderFixCard(){
+  if(!lastFix)return'';
   const i=t();
+  const f=lastFix;
+  return `<div class="card fix-card"><h2>${esc(i.fixedByYou)}</h2>
+    <p class="fix-meta">${esc(i.actionId)}: <b>${esc(f.action_id)}</b></p>
+    <p class="prose">${esc(f.detail)}</p>
+    <p class="fix-meta">${esc(f.ts)}</p>
+    <div class="fix-chains">
+      <div class="panel before"><h3>${esc(i.before)}</h3><div class="mini chain">${renderChain(f.before,false)}</div></div>
+      <div class="panel after"><h3>${esc(i.after)}</h3><div class="mini chain">${renderChain(f.after,false)}</div></div>
+    </div></div>`;
+}
+
+function render(r, opts){
+  const i=t();
+  const scroll=!(opts&&opts.scroll===false);
+  const afterFix=!!(opts&&opts.afterFix)||!!lastFix;
   hideHowAfterResult();
   if(!r.ok){
-    $('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div><p class="hint">${esc(i.noOrderHint)}</p></div>`;
+    $('#out').innerHTML=`${renderFixCard()}<div class="card"><div class="headline">${esc(trHeadline(r.headline))}</div><p class="hint">${esc(i.noOrderHint)}</p></div>`;
+    if(scroll)$('#out').scrollIntoView({behavior:'smooth',block:'start'});
     return;
   }
-  const chain=r.chain.map((l,idx)=>`<div class="link ${esc(l.state)}" data-i="${esc(idx)}" tabindex="0" role="button"><b>${esc(l.label)}</b><small>${esc(l.note)}</small>${l.refs.length?`<small class="mut">${esc(l.refs.length)} ${esc(i.rows)} ↗</small>`:''}</div>`).join('');
+  const chain=renderChain(r.chain,true);
   const cited=new Set(r.chain.flatMap(l=>l.refs));
-  const rows=Object.entries(r.rows).map(([table,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${esc(table)} <span class="tag">${esc(rs.length)}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${esc(slug(x.ref))}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
+  const rows=Object.entries(r.rows).map(([table,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${esc(table)} <span class="tag">${esc(rowsLabel(rs.length))}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${esc(slug(x.ref))}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
   let citeNote=i.citationSkip;
   if(r.citation_check&&r.citation_check.checked)citeNote=r.citation_check.ok?i.citationOk:i.citationFail;
-  const showApprove=r.broken!=null;
-  const fixNote=auditNote?`<p style="color:var(--ok);font-size:13px;margin:8px 0 0">${esc(auditNote)}</p>`:`<p id="approve-msg" class="hint" style="margin:8px 0 0" hidden></p>`;
+  const needsFix=r.broken!=null;
+  const fixTag=needsFix
+    ?`<span class="tag warn">${esc(i.needsApproval)}</span>`
+    :`<span class="tag ok">${esc(i.noFixNeeded)}</span>`;
+  const replyNote=afterFix?`<p class="reply-note">${esc(i.sendAfterFix)}</p>`:'';
 
   $('#out').innerHTML=`
+  ${renderFixCard()}
+  <div class="card"><div class="headline">${esc(trHeadline(r.headline))}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div>
+    <div class="chain">${chain}</div></div>
   <div class="two">
-    <div class="card"><div class="card-head"><h2>${esc(i.reply)}</h2><button type="button" class="ghost" id="copy-reply">${esc(i.copy)}</button></div><pre id="reply-text">${esc(r.customer_reply)}</pre>
+    <div class="card"><div class="card-head"><h2>${esc(i.reply)}</h2><button type="button" class="ghost" id="copy-reply">${esc(i.copy)}</button></div>
+      ${replyNote}<div class="prose" id="reply-text">${esc(r.customer_reply)}</div>
       <div style="margin-top:10px"><button type="button" class="ghost" id="evidence-btn">${esc(i.evidenceBtn)}</button></div></div>
-    <div class="card"><div class="card-head"><h2>${esc(i.fix)} <span class="tag">${esc(i.needsApproval)}</span></h2></div><pre>${esc(r.fix_action)}</pre>
-      ${showApprove?`<div style="margin-top:10px"><button type="button" id="approve-btn">${esc(i.approveFix)}</button></div>`:''}
-      ${fixNote}</div>
+    <div class="card"><div class="card-head"><h2>${esc(i.fix)} ${fixTag}</h2></div><div class="prose">${esc(r.fix_action)}</div>
+      ${needsFix?`<div style="margin-top:10px"><button type="button" id="approve-btn">${esc(i.approveFix)}</button></div>`:''}
+      <p id="approve-msg" class="hint" style="margin:8px 0 0" hidden></p></div>
   </div>
   ${renderSteps(r.steps)}
-  <div class="card"><div class="headline">${esc(r.headline)}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div>
-    <h2 style="margin-top:12px">${esc(i.chain)}</h2><div class="chain">${chain}</div></div>
   <div class="card"><h2>${esc(i.why)}</h2><p>${linkifyExplain(r.explanation)}</p>
     <p class="mut" style="font-size:12px">${esc(citeNote)}</p></div>
   <div class="card two"><div><h2>${esc(i.verified)}</h2><ul>${r.verified.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></div>
@@ -386,7 +483,7 @@ function render(r, auditNote){
   const apBtn=$('#approve-btn');
   if(apBtn)apBtn.onclick=()=>approveFix(r.order_id);
 
-  document.querySelectorAll('.link').forEach(el=>{
+  document.querySelectorAll('#out .link[data-i]').forEach(el=>{
     const activate=()=>{const l=r.chain[+el.dataset.i];if(l&&l.refs[0])goToRef(l.refs[0]);};
     el.onclick=activate;
     el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();}};
@@ -394,19 +491,31 @@ function render(r, auditNote){
   document.querySelectorAll('a.cite').forEach(a=>{
     a.onclick=e=>{e.preventDefault();goToRef(a.dataset.ref);};
   });
+  if(scroll)$('#out').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-async function approveFix(orderId){
+async function approveFix(orderId, customerConfirmed){
   const i=t();
   const btn=$('#approve-btn');
   const msg=$('#approve-msg');
   if(btn)btn.disabled=true;
   $('#status').textContent=i.approving;
+  const beforeChain=lastResult&&lastResult.chain?lastResult.chain.slice():[];
   try{
+    const payload={order_id:orderId,approved_by:'seller'};
+    if(customerConfirmed)payload.customer_confirmed=true;
     const res=await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({order_id:orderId,approved_by:'seller'})});
+      body:JSON.stringify(payload)});
     if(res.status===409||res.status===400){
       const text=await res.text();
+      if(res.status===409&&text.startsWith('Ask the customer to confirm')){
+        if(confirm(i.confirmAddress)){
+          return approveFix(orderId,true);
+        }
+        if(msg){msg.hidden=false;msg.textContent=text;msg.style.color='var(--bad)';}
+        else $('#status').textContent=text;
+        return;
+      }
       if(msg){msg.hidden=false;msg.textContent=text;msg.style.color='var(--bad)';}
       else $('#status').textContent=text;
       return;
@@ -417,11 +526,18 @@ async function approveFix(orderId){
     }
     const body=await res.json();
     const audit=body.audit||{};
-    const note=i.fixedNote(audit.action_id||'—',audit.approved_by||'seller',audit.ts||'');
+    const applied=body.applied||{};
+    lastFix={
+      action_id:audit.action_id||'—',
+      detail:applied.detail||audit.detail||'',
+      ts:audit.ts||'',
+      before:beforeChain,
+      after:(body.after&&body.after.chain)||[],
+    };
     lastResult=body.after;
     $('#status').textContent=statusLine(body.after);
     showReceipt(body.after);
-    render(body.after, note);
+    render(body.after,{afterFix:true});
   }catch(_){
     $('#status').textContent=i.errNetwork;
   }finally{
