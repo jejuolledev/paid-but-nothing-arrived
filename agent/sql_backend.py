@@ -29,12 +29,21 @@ class DuckDBBackend:
             if not p.exists():
                 raise FileNotFoundError(f"{p} missing — run `python data/gen_synthetic.py` first")
             cols = 'email_id, "to" AS to_address, event, ts, order_tag' if t == "mail_events" else "*"
-            self.con.execute(f"CREATE VIEW {t} AS SELECT {cols} FROM read_csv_auto('{p}', header=true, all_varchar=true)")
+            # TABLE (not VIEW) so approved fixes can write rows; CSVs stay the seed.
+            self.con.execute(f"CREATE TABLE {t} AS SELECT {cols} FROM read_csv_auto('{p}', header=true, all_varchar=true)")
+        self.con.execute(
+            "CREATE TABLE actions (action_id VARCHAR, order_id VARCHAR, kind VARCHAR, "
+            "detail VARCHAR, approved_by VARCHAR, ts VARCHAR)"
+        )
 
     def query(self, sql: str) -> list[dict[str, Any]]:
         cur = self.con.execute(sql)
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    def execute(self, sql: str) -> None:
+        """Run a write statement (INSERT / UPDATE). Offline demo only."""
+        self.con.execute(sql)
 
 
 class ZetarisBackend:

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env.local")
+from agent.actions import READONLY_MSG, NothingToFix, ReadOnlyBackend, approve  # noqa: E402
 from agent.investigator import investigate  # noqa: E402
 
 app = FastAPI(title="Paid, but nothing arrived")
@@ -19,6 +20,11 @@ class Ask(BaseModel):
     message: str
     email: str = ""
     order_id: str = ""
+
+
+class ApproveBody(BaseModel):
+    order_id: str
+    approved_by: str = "seller"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -34,6 +40,19 @@ def cases():
 @app.post("/api/investigate")
 def api_investigate(ask: Ask):
     return JSONResponse(investigate(ask.message, ask.email, ask.order_id))
+
+
+@app.post("/api/approve")
+def api_approve(body: ApproveBody):
+    """Apply a human-approved fix (DuckDB offline demo only). Zetaris answers 409."""
+    try:
+        return JSONResponse(approve(body.order_id, body.approved_by))
+    except ReadOnlyBackend:
+        return PlainTextResponse(READONLY_MSG, status_code=409)
+    except NothingToFix:
+        return PlainTextResponse("Nothing to fix", status_code=400)
+    except ValueError as e:
+        return PlainTextResponse(str(e), status_code=400)
 
 
 @app.post("/api/evidence")

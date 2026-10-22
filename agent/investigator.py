@@ -88,6 +88,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
     from .sql_backend import get_backend
     db = backend or get_backend()
     tools, trace, t0 = Tools(db), [], time.time()
+    lang = "ko" if re.search(r"[가-힣]", message or "") else "en"
 
     def mark(step, detail):
         trace.append(Trace(step, detail, int((time.time() - t0) * 1000)))
@@ -140,9 +141,12 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
     receipts = [st.get("receipt") for st in steps]
     if client:
         try:
+            lang_note = " Reply language: Korean (polite 존댓말)." if lang == "ko" else ""
+            user_payload = _mask(json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(),
+                                             "rows": _redact(journey, email), "investigation": loop_finding}, default=str), email)
             resp = client.chat.completions.create(model=model, temperature=0.2, max_tokens=4000, reasoning_effort=os.getenv("LLM_REASONING", "none"),
-                messages=[{"role": "system", "content": SYSTEM},
-                          {"role": "user", "content": _mask(json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(), "rows": _redact(journey, email), "investigation": loop_finding}, default=str), email)}])
+                messages=[{"role": "system", "content": SYSTEM + lang_note},
+                          {"role": "user", "content": user_payload}])
             from .agent_loop import _parse
             texts = _parse(resp.choices[0].message.content or "")
             if not texts:
@@ -154,7 +158,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
             texts["fix_action"] = verdict.suggested_fix  # the fix is decided by the verifier, never by the model
             if not _reply_ok(texts.get("customer_reply", ""), verdict):
-                texts["customer_reply"] = _template_reply(verdict); citation["reply_replaced"] = True
+                texts["customer_reply"] = _template_reply(verdict, lang); citation["reply_replaced"] = True
             if not ok:
                 texts["explanation"] = verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs)
                 citation["replaced_with_verifier_text"] = True
@@ -163,7 +167,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             mark("llm_explain", f"failed: {type(e).__name__}: {e}"[:200])
     if texts is None:
         texts = {"explanation": verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs),
-                 "customer_reply": _template_reply(verdict), "fix_action": verdict.suggested_fix}
+                 "customer_reply": _template_reply(verdict, lang), "fix_action": verdict.suggested_fix}
         mark("template_texts", "no LLM endpoint configured — verifier text used")
 
     return {"ok": True, "order_id": target["order_id"], "email": target["email"], "headline": verdict.headline,
@@ -171,13 +175,13 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             "broken": verdict.broken, "verified": verdict.verified, "unverified": verdict.unverified,
             "explanation": texts["explanation"], "customer_reply": texts["customer_reply"], "fix_action": texts["fix_action"],
             "rows": journey, "trace": [asdict(t) for t in trace], "steps": steps, "receipts": [r for r in receipts if r], "llm": llm_used, "citation_check": citation, "backend": db.name,
-            "elapsed_ms": int((time.time() - t0) * 1000)}
+            "lang": lang, "elapsed_ms": int((time.time() - t0) * 1000)}
 
 
-REPLY_MUST = {None: r"never charged|not charged|no charge|wasn't charged|was not charged|not been charged|in your account|went through",
-              "order_created": r"payment (went|came) through|was processed|confirm|releas|grant",
-              "credit_granted": r"twice|duplicate|double|two", "mail_delivered": r"mail|notice|notif",
-              "account_mismatch": r"address|account|email|typo"}
+REPLY_MUST = {None: r"never charged|not charged|no charge|wasn't charged|was not charged|not been charged|in your account|went through|청구되지|이용권",
+              "order_created": r"payment (went|came) through|was processed|confirm|releas|grant|결제|확인|이용권",
+              "credit_granted": r"twice|duplicate|double|two|두 번|중복", "mail_delivered": r"mail|notice|notif|메일|안내",
+              "account_mismatch": r"address|account|email|typo|주소"}
 
 
 def _reply_ok(reply: str, v) -> bool:
@@ -188,11 +192,13 @@ def _reply_ok(reply: str, v) -> bool:
         return False  # the model may not promise money; a person decides that
     key = v.broken if v.broken in REPLY_MUST else None
     if key is None and "never charged" not in v.headline.lower() and v.broken is None:
-        return bool(re.search(r"in your account|went through|everything", reply, re.I))
+        return bool(re.search(r"in your account|went through|everything|이용권|계정", reply, re.I))
     return bool(re.search(REPLY_MUST[key], reply, re.I))
 
 
-def _template_reply(v) -> str:
+def _template_reply(v, lang: str = "en") -> str:
+    if lang == "ko":
+        return _template_reply_ko(v)
     if v.broken is None and "never charged" in v.headline.lower():
         return "Thank you for writing. I checked our payment provider: no charge was made on your card for this order, so nothing is missing and nothing will be billed. Here is a fresh checkout link whenever you are ready."
     if v.broken == "order_created":
@@ -204,3 +210,18 @@ def _template_reply(v) -> str:
     if v.broken == "mail_delivered":
         return "Thank you for your patience. Your credits are already in your account — our confirmation email failed to send, so you were never told. Please log in and check your balance; I am resending the confirmation now."
     return "Thank you for writing. I checked every step of your order and everything went through; your credits are in your account."
+
+
+def _template_reply_ko(v) -> str:
+    """Same facts as the English templates; polite 존댓말; no internal refs."""
+    if v.broken is None and "never charged" in v.headline.lower():
+        return "문의해 주셔서 감사합니다. 결제 대행사를 확인한 결과 이번 주문에 대해 카드에 청구된 내역이 없습니다. 빠진 이용권도 없고 추가 청구도 되지 않습니다. 준비되시면 새 결제 링크로 다시 진행해 주세요."
+    if v.broken == "order_created":
+        return "기다려 주셔서 감사합니다. 결제 대행사 기준으로는 결제가 정상 완료된 것을 확인했습니다. 이후 주문을 마무리하지 못한 것은 저희 쪽 문제입니다. 지금 이용권을 지급하고 있으며, 곧 확인 메일을 보내 드리겠습니다."
+    if v.broken == "credit_granted":
+        return "문의해 주셔서 감사합니다. 결제와 주문은 정상입니다. 이용권이 실수로 두 번 지급된 것을 확인했고, 구매하신 이용권은 그대로 두고 중복분만 정리하겠습니다. 고객님께서 추가로 하실 일은 없습니다."
+    if v.broken == "account_mismatch":
+        return "문의해 주셔서 감사하고, 걱정 끼쳐 드려 죄송합니다. 결제는 정상입니다. 주문은 결제하신 주소와 조금 다른 이메일로 저장되어 이용권과 안내 메일이 그쪽으로 갔습니다. 이 주소가 맞으신지 확인해 주시면, 바로 고객님 계정으로 이용권을 옮겨 드리겠습니다."
+    if v.broken == "mail_delivered":
+        return "기다려 주셔서 감사합니다. 이용권은 이미 계정에 지급되어 있습니다. 확인 메일 발송에 실패해 안내를 드리지 못했습니다. 로그인하셔서 잔액을 확인해 주세요. 확인 메일을 다시 보내 드리겠습니다."
+    return "문의해 주셔서 감사합니다. 주문 전 단계를 확인했고 모두 정상입니다. 이용권은 계정에 있습니다."

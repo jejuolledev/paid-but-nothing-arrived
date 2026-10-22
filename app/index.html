@@ -48,6 +48,7 @@ details{margin-top:14px}details>summary{cursor:pointer;font-size:18px;font-weigh
 <div class="card">
   <textarea id="msg" rows="3"></textarea>
   <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button id="go"></button><span class="mut" id="status"></span></div>
+  <div id="receipt-line" class="mut" style="font-size:12px;margin-top:4px" hidden></div>
   <div id="empty-hint" class="hint" hidden></div>
   <div class="samples" id="samples"></div>
 </div>
@@ -94,6 +95,11 @@ const I18N={
     templateExplain:'Explanation: template (no model connected)',
     dataZetaris:'Data: Zetaris',
     dataLocal:'Data: local files',
+    approveFix:'Approve fix',
+    approving:'Applying fix…',
+    fixedNote:(id,by,ts)=>'Fixed and logged — audit '+id+', approved by '+by+' at '+ts,
+    routedBy:(model,rid)=>'Routed by Meterless Nightshift → '+model+' · receipt '+rid,
+    modelLabel:'model',
   },
   ko:{
     title:'결제했는데 아무것도 안 왔어요.',
@@ -130,6 +136,11 @@ const I18N={
     templateExplain:'설명: 템플릿(연결된 모델 없음)',
     dataZetaris:'데이터: Zetaris',
     dataLocal:'데이터: 로컬 파일',
+    approveFix:'수정 승인',
+    approving:'수정 적용 중…',
+    fixedNote:(id,by,ts)=>'수정 완료·기록됨 — 감사 '+id+', 승인자 '+by+', '+ts,
+    routedBy:(model,rid)=>'Meterless Nightshift 경유 → '+model+' · receipt '+rid,
+    modelLabel:'모델',
   }
 };
 
@@ -179,6 +190,19 @@ function statusLine(r){
   if(data)parts.push(data);
   if(r.elapsed_ms!=null)parts.push(r.elapsed_ms+' '+i.ms);
   return parts.join(' · ');
+}
+
+function showReceipt(r){
+  const el=$('#receipt-line');
+  if(!el)return;
+  const i=t();
+  if(!Array.isArray(r.receipts)||!r.receipts.length){el.hidden=true;el.textContent='';return;}
+  const last=r.receipts[r.receipts.length-1]||{};
+  const model=last.model||last.provider_model||last.requested_model||'';
+  const rid=last.receipt_id||'';
+  if(!model&&!rid){el.hidden=true;el.textContent='';return;}
+  el.hidden=false;
+  el.textContent=i.routedBy(model||'—',rid||'—');
 }
 
 function goToRef(ref){
@@ -240,6 +264,7 @@ async function run(){
     const r=await res.json();
     lastResult=r;
     $('#status').textContent=statusLine(r);
+    showReceipt(r);
     render(r);
   }catch(_){
     lastResult=null;
@@ -259,6 +284,10 @@ function renderSteps(steps){
       const args=s.args!=null?(typeof s.args==='string'?s.args:JSON.stringify(s.args)):'';
       bits.push(`<div class="tool">${esc(s.tool)}${args?` ${esc(args)}`:''}${s.rows!=null?` · ${esc(s.rows)} ${esc(i.rows)}`:''}${s.error?' · error':''}</div>`);
     }
+    if(s.receipt){
+      const m=s.receipt.model||s.receipt.provider_model||s.receipt.requested_model||'';
+      if(m)bits.push(`<div class="mut">${esc(i.modelLabel)}: ${esc(m)}</div>`);
+    }
     if(s.done||s.order_id)bits.push(`<div class="mut">${esc(i.namedOrder)}: <b>${esc(s.order_id||'—')}</b></div>`);
     if(s.ms!=null)bits.push(`<div class="mut">${esc(s.ms)} ${esc(i.ms)}</div>`);
     return `<li>${bits.join('')}</li>`;
@@ -266,7 +295,7 @@ function renderSteps(steps){
   return `<div class="card"><h2>${esc(i.investigation)}</h2><ol class="timeline">${items}</ol></div>`;
 }
 
-function render(r){
+function render(r, auditNote){
   const i=t();
   if(!r.ok){
     $('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div><p class="hint">${esc(i.noOrderHint)}</p></div>`;
@@ -277,12 +306,16 @@ function render(r){
   const rows=Object.entries(r.rows).map(([table,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${esc(table)} <span class="tag">${esc(rs.length)}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${esc(slug(x.ref))}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
   let citeNote=i.citationSkip;
   if(r.citation_check&&r.citation_check.checked)citeNote=r.citation_check.ok?i.citationOk:i.citationFail;
+  const showApprove=r.broken!=null;
+  const fixNote=auditNote?`<p style="color:var(--ok);font-size:13px;margin:8px 0 0">${esc(auditNote)}</p>`:`<p id="approve-msg" class="hint" style="margin:8px 0 0" hidden></p>`;
 
   $('#out').innerHTML=`
   <div class="two">
     <div class="card"><div class="card-head"><h2>${esc(i.reply)}</h2><button type="button" class="ghost" id="copy-reply">${esc(i.copy)}</button></div><pre id="reply-text">${esc(r.customer_reply)}</pre>
       <div style="margin-top:10px"><button type="button" class="ghost" id="evidence-btn">${esc(i.evidenceBtn)}</button></div></div>
-    <div class="card"><div class="card-head"><h2>${esc(i.fix)} <span class="tag">${esc(i.needsApproval)}</span></h2></div><pre>${esc(r.fix_action)}</pre></div>
+    <div class="card"><div class="card-head"><h2>${esc(i.fix)} <span class="tag">${esc(i.needsApproval)}</span></h2></div><pre>${esc(r.fix_action)}</pre>
+      ${showApprove?`<div style="margin-top:10px"><button type="button" id="approve-btn">${esc(i.approveFix)}</button></div>`:''}
+      ${fixNote}</div>
   </div>
   ${renderSteps(r.steps)}
   <div class="card"><div class="headline">${esc(r.headline)}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div>
@@ -300,6 +333,8 @@ function render(r){
   };
   const evBtn=$('#evidence-btn');
   if(evBtn)evBtn.onclick=()=>evidence();
+  const apBtn=$('#approve-btn');
+  if(apBtn)apBtn.onclick=()=>approveFix(r.order_id);
 
   document.querySelectorAll('.link').forEach(el=>{
     const activate=()=>{const l=r.chain[+el.dataset.i];if(l&&l.refs[0])goToRef(l.refs[0]);};
@@ -309,6 +344,39 @@ function render(r){
   document.querySelectorAll('a.cite').forEach(a=>{
     a.onclick=e=>{e.preventDefault();goToRef(a.dataset.ref);};
   });
+}
+
+async function approveFix(orderId){
+  const i=t();
+  const btn=$('#approve-btn');
+  const msg=$('#approve-msg');
+  if(btn)btn.disabled=true;
+  $('#status').textContent=i.approving;
+  try{
+    const res=await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({order_id:orderId,approved_by:'seller'})});
+    if(res.status===409||res.status===400){
+      const text=await res.text();
+      if(msg){msg.hidden=false;msg.textContent=text;msg.style.color='var(--bad)';}
+      else $('#status').textContent=text;
+      return;
+    }
+    if(!res.ok){
+      $('#status').textContent=i.errHttp;
+      return;
+    }
+    const body=await res.json();
+    const audit=body.audit||{};
+    const note=i.fixedNote(audit.action_id||'—',audit.approved_by||'seller',audit.ts||'');
+    lastResult=body.after;
+    $('#status').textContent=statusLine(body.after);
+    showReceipt(body.after);
+    render(body.after, note);
+  }catch(_){
+    $('#status').textContent=i.errNetwork;
+  }finally{
+    if(btn)btn.disabled=false;
+  }
 }
 
 async function evidence(){
