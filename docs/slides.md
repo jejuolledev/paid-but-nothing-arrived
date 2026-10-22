@@ -13,6 +13,12 @@ Track 02 — The Agent That Can Explain Why · Team MoaHub (solo)
 
 ---
 
+# How it works, in one picture
+
+![w:1100](how-it-works.png)
+
+---
+
 # The problem, the user
 
 - Who: a one-person or small online seller of digital goods, credits, subscriptions. No support team.
