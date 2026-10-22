@@ -84,7 +84,8 @@ def _approve(order_id: str, approved_by: str, backend, customer_confirmed: bool)
         f"'{detail.replace(chr(39), '')}', '{by}', '{ts}')"
     )
     audit = db.query(f"SELECT * FROM actions WHERE action_id = '{action_id}'")[0]
-    after = investigate(f"order {order_id}", order_id=order_id, backend=db)
+    # re-check with the verifier only: the chain is deterministic, and the seller should not wait on a model
+    after = investigate(f"order {order_id}", order_id=order_id, backend=db, use_model=False)
     return {"applied": applied, "audit": audit, "after": after}
 
 

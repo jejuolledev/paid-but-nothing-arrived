@@ -87,7 +87,7 @@ def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
     return (len(cited) > 0 and not bad), bad
 
 
-def investigate(message: str, email: str = "", order_id: str = "", backend=None) -> dict:
+def investigate(message: str, email: str = "", order_id: str = "", backend=None, use_model: bool = True) -> dict:
     from .sql_backend import get_backend
     db = backend or get_backend()
     tools, trace, t0 = Tools(db), [], time.time()
@@ -104,7 +104,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
         m = re.search(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", message); email = m.group(0) if m else email
     if not order_id and not email:
         return {"ok": False, "headline": "Add the order number (ord_0000) or the customer's email to the message.", "trace": [], "backend": db.name}
-    client, model = _client()
+    client, model = _client() if use_model else (None, None)
     steps, loop_finding = [], ""
     target = None
     # 1a. with a model: the model decides which records to pull (tools are read-only and scoped to the
@@ -148,7 +148,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
     refs = {r["ref"] for rows in journey.values() for r in rows}
 
     # 4. explanation + reply + fix (LLM, citation-checked)
-    texts, llm_used, citation = None, "none", {"checked": False}
+    texts, llm_used, citation = None, ("none" if use_model else "verifier-only"), {"checked": False}
     receipts = [st.get("receipt") for st in steps]
     if client:
         try:
@@ -188,7 +188,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
     if texts is None:
         texts = {"explanation": verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs),
                  "customer_reply": _template_reply(verdict, lang), "fix_action": verdict.suggested_fix}
-        mark("template_texts", "model call failed — verifier text used" if llm_used == "failed" else "no LLM endpoint configured — verifier text used")
+        mark("template_texts", {"failed": "model call failed — verifier text used", "verifier-only": "re-check after a fix — verifier only"}.get(llm_used, "no LLM endpoint configured — verifier text used"))
 
     return {"ok": True, "order_id": target["order_id"], "email": target["email"], "headline": verdict.headline,
             "chain": [{"name": l.name, "label": LABELS[l.name], "state": l.state, "note": l.note, "refs": l.refs} for l in verdict.links],
