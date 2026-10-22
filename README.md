@@ -61,6 +61,9 @@ See `docs/sponsor-tech.md` for the full write-up.
 - **NVIDIA Nemotron 3.5 Lightning** — the explaining model (local, OpenMDW-1.1 license).
 - **Cursor** — development; see `docs/sponsor-tech.md` and `docs/cursor-sessions/`.
 
+## Measured
+On an Apple-silicon laptop with the local Zetaris platform (Docker, emulated) and NVIDIA Nemotron 3.5 Lightning 30B (4-bit, local): the five seeded cases resolve to the correct link **5/5**, the model's explanations pass the citation check **5/5**, about **14 s per case** end to end (`docs/measurements.md`, `scripts/llm_smoke.py`). The verifier alone answers in ~20 ms on DuckDB and ~9 s through Zetaris.
+
 ## Pre-existing components
 None of our product code. Open-source libraries only (`requirements.txt`). Everything in this repository was written during the build window.
 

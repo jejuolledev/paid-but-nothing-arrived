@@ -17,7 +17,9 @@ SYSTEM = (
     "are supported by rows the tools returned, and you must cite them with the exact `ref` value in square "
     "brackets, e.g. [orders:ord_0901] or [server_logs:2026-10-13T12:00:44Z@/api/payments/confirm]. Never invent a row. "
     "Output JSON with keys: explanation (<=120 words, cite at least one ref), "
-    "customer_reply (plain, kind, <=90 words, no internal refs), fix_action (one imperative sentence)."
+    "customer_reply (written BY the seller TO the customer, <=90 words, plain and kind; state what happened and what you will do; "
+    "if nothing was charged say so clearly; never ask the customer to investigate; no internal refs), "
+    "fix_action (one imperative sentence for the seller)."
 )
 
 
@@ -85,6 +87,8 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             texts = json.loads(resp.choices[0].message.content); llm_used = model
             texts["_raw_explanation"] = texts.get("explanation", "")
             ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
+            if not _reply_ok(texts.get("customer_reply", ""), verdict):
+                texts["customer_reply"] = _template_reply(verdict); citation["reply_replaced"] = True
             if not ok:
                 texts["explanation"] = verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs)
                 citation["replaced_with_verifier_text"] = True
@@ -102,6 +106,21 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             "explanation": texts["explanation"], "customer_reply": texts["customer_reply"], "fix_action": texts["fix_action"],
             "rows": journey, "trace": [asdict(t) for t in trace], "llm": llm_used, "citation_check": citation, "backend": db.name,
             "elapsed_ms": int((time.time() - t0) * 1000)}
+
+
+REPLY_MUST = {None: r"never charged|not charged|no charge|wasn't charged|was not charged|not been charged|in your account|went through",
+              "order_created": r"payment (went|came) through|was processed|confirm|releas|grant",
+              "credit_granted": r"twice|duplicate|double|two", "mail_delivered": r"mail|notice|notif"}
+
+
+def _reply_ok(reply: str, v) -> bool:
+    """The reply must be the seller speaking and must carry the verdict; otherwise the template is safer."""
+    if not reply or re.search(r"\b(let me check my account|you gave me|my order|my credits)\b", reply, re.I):
+        return False
+    key = v.broken if v.broken in REPLY_MUST else None
+    if key is None and "never charged" not in v.headline.lower() and v.broken is None:
+        return bool(re.search(r"in your account|went through|everything", reply, re.I))
+    return bool(re.search(REPLY_MUST[key], reply, re.I))
 
 
 def _template_reply(v) -> str:

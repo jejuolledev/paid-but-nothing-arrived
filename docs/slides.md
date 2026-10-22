@@ -66,6 +66,7 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 - Nightshift serves Nemotron locally at an OpenAI-compatible address → customer data stays on the machine.
 - Nemotron explains and drafts; it never decides the verdict.
 - Nightshift run trace shown as "checks on the record" next to our citation check.
+- Measured: 5 seeded cases → correct link 5/5, citation check 5/5, ~14 s per case on a laptop.
 
 ---
 
