@@ -4,6 +4,8 @@
 
 ![How it works](docs/how-it-works.png)
 
+The same story as a six-panel comic: [docs/comic/comic_strip.png](docs/comic/comic_strip.png).
+
 Every online seller gets this message: **"I paid, but nothing arrived."** If the answer is slow, the next step is a card dispute ("product not received"). Today the seller opens four screens — the payment provider, the orders database, the server logs, the mail provider — and lines them up by hand.
 
 This agent does that in one pass. It asks **one SQL door (Zetaris)** — in this demo, five synthetic tables standing in for those four systems, registered in Zetaris and joined in one semantic layer — walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. **NVIDIA Nemotron 3.5 Lightning**, called through **Meterless Nightshift** on the seller's Mac, decides which records to pull and writes the explanation and the customer reply. The explanation must cite the rows the tools returned (a citation check replaces it otherwise); the verdict and the fix come from a deterministic verifier, never from the model.
