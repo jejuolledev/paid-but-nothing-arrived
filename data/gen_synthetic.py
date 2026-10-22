@@ -114,6 +114,21 @@ def main() -> None:
     cases.append(dict(case=5, title="Never charged", email=em, order_id="ord_0905", broken_link=None,
                       expected="No PSP payment exists for this order; the customer left before the card step. Nothing is broken and nothing was charged."))
 
+    # ---- Case 6: not in the verifier's playbook — paid with one email, ordered under a typo of it.
+    # The customer writes from the right address; the orders table has nothing for it. Only the PSP
+    # ledger knows the real address, and the grant went to the typo account. The agent has to find this.
+    when = T0 + timedelta(days=19, hours=8); em = "liam.patel906@example.com"; typo = "liam.patel906@exmaple.com"; key, _, amount = REWARDS[1]
+    payments.append(dict(payment_id="pay_0906", amount=amount, currency="KRW", status="PAID", card_last4="5556", customer_email=em, created_at=ts(when+timedelta(seconds=20))))
+    orders.append(dict(order_id="ord_0906", payment_id="pay_0906", email=typo, reward_key=key, amount=amount, status="paid", credited=1, created_at=ts(when), updated_at=ts(when+timedelta(seconds=28))))
+    grants.append(dict(grant_id="g_ord_0906", email=typo, reward_key=key, credits=30, status="granted", order_id="ord_0906", created_at=ts(when+timedelta(seconds=27))))
+    logs += [dict(ts=ts(when+timedelta(seconds=21)), route="/api/payments/webhook", order_id="ord_0906", http_status=200, message="PSP webhook PAID"),
+             dict(ts=ts(when+timedelta(seconds=26)), route="/api/payments/confirm", order_id="ord_0906", http_status=200, message="confirmed; credits granted"),
+             dict(ts=ts(when+timedelta(seconds=29)), route="/api/mail/send", order_id="ord_0906", http_status=200, message="credit mail queued")]
+    mails += [dict(email_id="m_ord_0906", to=typo, event="sent", ts=ts(when+timedelta(seconds=30)), order_tag="ord_0906"),
+              dict(email_id="m_ord_0906", to=typo, event="bounced", ts=ts(when+timedelta(seconds=33)), order_tag="ord_0906")]
+    cases.append(dict(case=6, title="Paid with one email, ordered under a typo", email=em, order_id="ord_0906", broken_link="account_mismatch",
+                      expected="No order under the customer's address. The PSP ledger has pay_0906 PAID by liam.patel906@example.com; that payment belongs to ord_0906, placed under liam.patel906@exmaple.com (typo). Credits went to the typo account and the mail bounced. Nothing is lost: move the 30 credits to the right account."))
+
     def write(name, rows):
         with open(OUT / name, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys())); w.writeheader(); w.writerows(rows)

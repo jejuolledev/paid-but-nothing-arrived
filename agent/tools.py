@@ -54,6 +54,14 @@ class Tools:
             "mail_events": _tag("mail_events", self.db.query(f"SELECT * FROM mail_events WHERE order_tag = {oid} OR lower(to_address) = lower({em}) ORDER BY ts")),
         }
 
+    def find_payments(self, email: str) -> list[dict[str, Any]]:
+        """PSP ledger rows paid by this email — the PSP knows the payer even when our order row has a different address."""
+        return _tag("payments", self.db.query(f"SELECT * FROM payments WHERE lower(customer_email) = lower({lit('email', email)}) ORDER BY created_at DESC LIMIT 10"))
+
+    def order_for_payment(self, payment_id: str) -> list[dict[str, Any]]:
+        """The order row that a PSP payment belongs to."""
+        return _tag("orders", self.db.query(f"SELECT * FROM orders WHERE payment_id = {lit('payment_id', payment_id)}"))
+
     def related_orders(self, email: str) -> list[dict[str, Any]]:
         """Other orders by the same email — catches duplicates and account-mismatch cases."""
         return _tag("orders", self.db.query(f"SELECT * FROM orders WHERE lower(email) = lower({lit('email', email)}) ORDER BY created_at DESC LIMIT 20"))

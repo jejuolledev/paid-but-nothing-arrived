@@ -38,5 +38,13 @@
     "order_id": "ord_0905",
     "broken_link": null,
     "expected": "No PSP payment exists for this order; the customer left before the card step. Nothing is broken and nothing was charged."
+  },
+  {
+    "case": 6,
+    "title": "Paid with one email, ordered under a typo",
+    "email": "liam.patel906@example.com",
+    "order_id": "ord_0906",
+    "broken_link": "account_mismatch",
+    "expected": "No order under the customer's address. The PSP ledger has pay_0906 PAID by liam.patel906@example.com; that payment belongs to ord_0906, placed under liam.patel906@exmaple.com (typo). Credits went to the typo account and the mail bounced. Nothing is lost: move the 30 credits to the right account."
   }
 ]

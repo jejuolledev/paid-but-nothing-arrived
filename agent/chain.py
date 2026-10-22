@@ -86,6 +86,19 @@ def verify(journey: dict) -> Verdict:
         unverified.append("Whether the customer saw an error screen (no client-side telemetry in these sources)")
         return Verdict(oid, links, "order_created", "Paid, but the order was never confirmed.", verified, unverified, cause, fix)
 
+    # 4a credits went to the account that paid? (PSP payer vs order address)
+    payer = (paid[-1].get("customer_email") or "").lower()
+    if payer and payer != (o.get("email") or "").lower():
+        bounced = [m for m in mails if m["event"] == "bounced"]
+        refs = [paid[-1]["ref"], o["ref"]] + [g["ref"] for g in grant_rows[:1]] + [m["ref"] for m in bounced[:1]]
+        links.append(Link("credit_granted", "red", f"Credits went to {o['email']}, but the card was paid by {paid[-1]['customer_email']}", refs))
+        links.append(Link("mail_delivered", "red" if bounced else "grey", "Mail bounced at the order address" if bounced else "Mail went to the order address", [m["ref"] for m in bounced[:1]]))
+        verified += [f"PSP payer is {paid[-1]['customer_email']} ({paid[-1]['ref']})", f"Order and grant use {o['email']} ({o['ref']})"]
+        unverified.append("Whether the order address is a typo of the payer's address or a second account (ask the customer)")
+        return Verdict(oid, links, "account_mismatch", "Paid, but the credits went to a different account.", verified, unverified,
+                       "The order was placed under a different address than the one that paid (looks like a typo); credits and mail went to that address.",
+                       "Move the credits to the payer's account after the customer confirms (requires approval). Code fix: prefill checkout with the signed-in address and warn on unknown domains.")
+
     # 4 credits granted — grants table
     if not grant_rows:
         links.append(Link("credit_granted", "red", "Order is paid but no grant row exists", [o["ref"]]))

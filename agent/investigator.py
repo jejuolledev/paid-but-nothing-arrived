@@ -50,9 +50,19 @@ REF_RE = re.compile(r"(?:payments|orders|grants|server_logs|mail_events):[A-Za-z
 PII_FIELDS = {"email", "customer_email", "to_address", "card_last4"}
 
 
-def _redact(journey: dict) -> dict:
-    """What the model sees: same rows and refs, without who the customer is."""
-    return {t: [{k: ("<redacted>" if k in PII_FIELDS else v) for k, v in r.items()} for r in rows] for t, rows in journey.items()}
+def _redact(journey: dict, customer_email: str = "") -> dict:
+    """What the model sees: same rows and refs; the customer's address becomes CUSTOMER, other
+    addresses keep only first letter + domain (a typo stays visible), card digits are dropped."""
+    from .agent_loop import Aliaser
+    al = Aliaser(customer_email)
+    return {t: al.rows(rows) for t, rows in journey.items()}
+
+
+def _mask(text: str, customer_email: str) -> str:
+    """Last pass over everything sent to the model: no full address survives, wherever it appears."""
+    from .agent_loop import Aliaser, EMAIL_RE
+    al = Aliaser(customer_email)
+    return EMAIL_RE.sub(lambda m: al.email(m.group(0)), text)
 
 
 def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
@@ -79,12 +89,35 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
         m = re.search(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", message); email = m.group(0) if m else email
     if not order_id and not email:
         return {"ok": False, "headline": "Add the order number (ord_0000) or the customer's email to the message.", "trace": [], "backend": db.name}
-    orders = tools.find_orders(email=email, order_id=order_id)
-    mark("find_orders", f"{len(orders)} order(s) for {order_id or email}")
-    if not orders:
-        return {"ok": False, "headline": "No order found for this customer.", "trace": [asdict(t) for t in trace], "backend": db.name}
-    # if several orders, investigate the most recent one that is not plainly healthy first
-    target = next((o for o in orders if not (o["status"] == "paid" and o["credited"] == "1")), orders[0])
+    client, model = _client()
+    steps, loop_finding = [], ""
+    target = None
+    # 1a. with a model: the model decides which records to pull (tools are read-only, ids are validated)
+    if client and email and not order_id:
+        try:
+            from .agent_loop import investigate_loop
+            res = investigate_loop(client, model, message, email, tools)
+            steps, loop_finding = res["steps"], res["finding"]
+            mark("agent_loop", f"{len(steps)} step(s), named {res['order_id'] or 'nothing'}")
+            if res["ok"]:
+                target = tools.find_orders(order_id=res["order_id"])[0]
+        except Exception as e:
+            mark("agent_loop", f"failed: {type(e).__name__}"[:120])
+    # 1b. without a model (or if it found nothing): our own lookup, then the PSP ledger by payer address
+    if target is None:
+        orders = tools.find_orders(email=email, order_id=order_id)
+        mark("find_orders", f"{len(orders)} order(s) for {order_id or email}")
+        if not orders and email:
+            pays = tools.find_payments(email)
+            mark("find_payments", f"{len(pays)} PSP payment(s) by this address")
+            for p in pays:
+                orders += tools.order_for_payment(p["payment_id"])
+            mark("order_for_payment", f"{len(orders)} order(s) behind those payments")
+        if not orders:
+            return {"ok": False, "headline": f"No order or payment found for {order_id or email}. Check the address the customer paid with, or ask for the order number.",
+                    "trace": [asdict(t) for t in trace], "steps": steps, "backend": db.name}
+        # if several orders, investigate the most recent one that is not plainly healthy first
+        target = next((o for o in orders if not (o["status"] == "paid" and o["credited"] == "1")), orders[0])
 
     # 2. journey + 3. deterministic verification (the part that is never delegated to a model)
     journey = tools.order_journey(target["order_id"]); mark("order_journey", f"{sum(len(v) for v in journey.values())} rows from 5 sources")
@@ -92,13 +125,12 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
     refs = {r["ref"] for rows in journey.values() for r in rows}
 
     # 4. explanation + reply + fix (LLM, citation-checked)
-    client, model = _client()
     texts, llm_used, citation = None, "none", {"checked": False}
     if client:
         try:
             resp = client.chat.completions.create(model=model, temperature=0.2, response_format={"type": "json_object"},
                 messages=[{"role": "system", "content": SYSTEM},
-                          {"role": "user", "content": json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(), "rows": _redact(journey)}, default=str)}])
+                          {"role": "user", "content": _mask(json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(), "rows": _redact(journey, email), "investigation": loop_finding}, default=str), email)}])
             texts = json.loads(resp.choices[0].message.content); llm_used = model
             texts["_raw_explanation"] = texts.get("explanation", "")
             ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
@@ -120,13 +152,14 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
             "chain": [{"name": l.name, "label": LABELS[l.name], "state": l.state, "note": l.note, "refs": l.refs} for l in verdict.links],
             "broken": verdict.broken, "verified": verdict.verified, "unverified": verdict.unverified,
             "explanation": texts["explanation"], "customer_reply": texts["customer_reply"], "fix_action": texts["fix_action"],
-            "rows": journey, "trace": [asdict(t) for t in trace], "llm": llm_used, "citation_check": citation, "backend": db.name,
+            "rows": journey, "trace": [asdict(t) for t in trace], "steps": steps, "llm": llm_used, "citation_check": citation, "backend": db.name,
             "elapsed_ms": int((time.time() - t0) * 1000)}
 
 
 REPLY_MUST = {None: r"never charged|not charged|no charge|wasn't charged|was not charged|not been charged|in your account|went through",
               "order_created": r"payment (went|came) through|was processed|confirm|releas|grant",
-              "credit_granted": r"twice|duplicate|double|two", "mail_delivered": r"mail|notice|notif"}
+              "credit_granted": r"twice|duplicate|double|two", "mail_delivered": r"mail|notice|notif",
+              "account_mismatch": r"address|account|email|typo"}
 
 
 def _reply_ok(reply: str, v) -> bool:
@@ -148,6 +181,8 @@ def _template_reply(v) -> str:
         return "Thank you for your patience. I can confirm your payment went through on our provider's side. Our system did not complete your order after that — that is our fault, not yours. I am releasing your credits now and you will receive a confirmation email shortly."
     if v.broken == "credit_granted":
         return "Thank you for writing. Your payment and order are fine. I found that the credits were issued twice by mistake; I will keep your purchased credits in place and correct the duplicate on our side. Nothing further is needed from you."
+    if v.broken == "account_mismatch":
+        return "Thank you for writing, and sorry for the worry. Your payment went through. The order was saved under a slightly different email address than the one you paid with, so the credits and the confirmation went there. Could you confirm this is your address? As soon as you do, I will move the credits to your account."
     if v.broken == "mail_delivered":
         return "Thank you for your patience. Your credits are already in your account — our confirmation email failed to send, so you were never told. Please log in and check your balance; I am resending the confirmation now."
     return "Thank you for writing. I checked every step of your order and everything went through; your credits are in your account."
