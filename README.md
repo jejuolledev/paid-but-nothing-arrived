@@ -4,7 +4,7 @@
 
 Every online seller gets this message: **"I paid, but nothing arrived."** If the answer is slow, the next step is a card dispute ("product not received"). Today the seller opens four screens — the payment provider, the orders database, the server logs, the mail provider — and lines them up by hand.
 
-This agent does that in one pass. It asks **one SQL door (Zetaris)** that federates all four sources, walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. A local **NVIDIA Nemotron** served by **Meterless Nightshift** writes the explanation, the customer reply and the fix suggestion, so customer data never leaves the seller's machine. Every sentence the model writes must cite a row `ref`; a citation check rejects anything else.
+This agent does that in one pass. It asks **one SQL door (Zetaris)** that federates all four sources, walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. A local **NVIDIA Nemotron** served by **Meterless Nightshift** writes the explanation and the customer reply on the seller's own machine. The explanation must cite the rows the tools returned (a citation check replaces it otherwise); the verdict and the fix come from a deterministic verifier, never from the model.
 
 It also knows how to say *nothing is broken*: when there is no charge at the PSP, the chain stops grey and the answer is "You were never charged."
 
