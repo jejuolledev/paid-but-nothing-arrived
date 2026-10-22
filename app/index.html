@@ -3,29 +3,52 @@
 <title>Paid, but nothing arrived</title>
 <style>
 :root{--bg:#0f1115;--card:#171a21;--line:#2a2f3a;--txt:#e8eaf0;--mut:#9aa3b2;--ok:#2ecc71;--bad:#ff4d4f;--grey:#4b5260;--acc:#5b8def}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 -apple-system,Inter,Segoe UI,sans-serif}
-header{padding:28px 20px 10px;max-width:980px;margin:auto}h1{font-size:26px;margin:0 0 4px}header p{color:var(--mut);margin:0}
-main{max-width:980px;margin:auto;padding:10px 20px 60px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px}
-textarea{width:100%;min-height:72px;background:#0c0e12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit}
-button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;cursor:pointer}button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
-.samples button{margin:4px 6px 0 0;font-size:13px}
+*{box-sizing:border-box}html,body{margin:0;max-width:100vw;overflow-x:hidden;background:var(--bg);color:var(--txt);font:15px/1.5 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}
+header{padding:28px 20px 10px;max-width:980px;margin:auto}h1{font-size:26px;margin:0 0 8px}
+header .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header .sub{color:var(--mut);margin:0 0 6px;max-width:42em}header .sponsors{color:var(--mut);font-size:12px;margin:0;opacity:.75}
+.lang{display:flex;gap:4px;flex-shrink:0}
+.lang button{padding:4px 10px;font-size:12px;border-radius:6px}.lang button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+main{max-width:980px;margin:auto;padding:10px 20px 60px;width:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px;max-width:100%}
+textarea{width:100%;min-height:72px;background:#0c0e12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;resize:vertical}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+.samples{margin-top:10px}.samples .label{display:block;color:var(--mut);font-size:13px;margin-bottom:4px}
+.samples button{margin:4px 6px 0 0;font-size:13px;text-align:left;max-width:100%;white-space:normal}
+.hint{color:var(--mut);font-size:13px;margin-top:8px}
 .chain{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}@media(max-width:640px){.chain{grid-template-columns:repeat(2,1fr)}}
-.link{border-radius:10px;padding:10px;border:2px solid var(--grey);cursor:pointer;min-height:92px}.link small{display:block;color:var(--mut);font-size:12px;margin-top:4px}
+.link{border-radius:10px;padding:10px;border:2px solid var(--grey);cursor:pointer;min-height:92px}.link:focus{outline:2px solid var(--acc);outline-offset:2px}
+.link small{display:block;color:var(--mut);font-size:12px;margin-top:4px}
 .green{border-color:var(--ok);background:rgba(46,204,113,.08)}.red{border-color:var(--bad);background:rgba(255,77,79,.12);animation:pulse 1.2s ease-in-out 3}.grey{opacity:.6}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,79,.5)}50%{box-shadow:0 0 0 8px rgba(255,77,79,0)}}
+@keyframes flashRow{0%,100%{background:transparent}20%,80%{background:rgba(91,141,239,.35)}}
+.flash{animation:flashRow 1.5s ease}
 h2{font-size:18px;margin:0 0 6px}.headline{font-size:22px;font-weight:600}.mut{color:var(--mut)}
-pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12.5px}
+pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;margin:0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:720px){.two{grid-template-columns:1fr}}
-ul{margin:6px 0;padding-left:18px}.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--mut);margin-left:6px}
-.rows table{width:100%;border-collapse:collapse;font-size:12.5px}.rows td,.rows th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+ul{margin:6px 0;padding-left:18px}.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--mut);margin-left:6px;vertical-align:middle}
+.rows{overflow-x:auto;-webkit-overflow-scrolling:touch}.rows table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+.rows td,.rows th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
 .cited{background:rgba(255,77,79,.12)}
+a.cite{color:var(--acc);text-decoration:underline;cursor:pointer}
+details{margin-top:14px}details>summary{cursor:pointer;font-size:18px;font-weight:600;list-style:revert}
+.timeline{list-style:none;padding:0;margin:8px 0 0}.timeline li{border-left:2px solid var(--line);padding:0 0 14px 14px;margin-left:6px;position:relative}
+.timeline li::before{content:"";position:absolute;left:-5px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.timeline li:last-child{padding-bottom:0}.timeline .tool{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--mut)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.card-head h2{margin:0}
 </style></head><body>
-<header><h1>Paid, but nothing arrived.</h1><p>Your customer already has proof they paid. This agent finds yours — one SQL door (Zetaris) over the payment ledger, orders, grants, server logs and mail events; a local Nemotron (Meterless Nightshift) explains. <span class="tag">all data synthetic</span></p></header>
+<header>
+  <div class="top"><h1 id="title"></h1><div class="lang" id="lang"></div></div>
+  <p class="sub" id="subtitle"></p>
+  <p class="sponsors" id="sponsors"></p>
+</header>
 <main>
 <div class="card">
-  <textarea id="msg" placeholder="Paste the customer's message, e.g. “Hi, I paid for the Standard pack but nothing showed up. Order ord_0901.”"></textarea>
-  <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button id="go">Investigate</button><span class="mut" id="status"></span></div>
+  <textarea id="msg" rows="3"></textarea>
+  <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button id="go"></button><span class="mut" id="status"></span></div>
+  <div id="empty-hint" class="hint" hidden></div>
   <div class="samples" id="samples"></div>
 </div>
 <div id="out"></div>
@@ -33,25 +56,278 @@ ul{margin:6px 0;padding-left:18px}.tag{display:inline-block;font-size:12px;borde
 <script>
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
-async function loadCases(){const cs=await (await fetch('/api/cases')).json();$('#samples').innerHTML='<span class="mut">Seeded cases:</span> '+cs.map(c=>`<button class="ghost" data-id="${c.order_id}">${esc(c.case)}. ${esc(c.title)}</button>`).join('');
-  document.querySelectorAll('#samples button').forEach(b=>b.onclick=()=>{$('#msg').value=`Hi, I paid but nothing arrived. My order is ${b.dataset.id}.`;run();});}
-async function run(){const message=$('#msg').value.trim();if(!message)return;$('#status').textContent='investigating…';$('#go').disabled=true;
-  const r=await (await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})})).json();
-  $('#go').disabled=false;$('#status').textContent=r.ok?`${r.elapsed_ms} ms · backend ${r.backend} · model ${r.llm}`:'';render(r);}
-function render(r){if(!r.ok){$('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div></div>`;return;}
-  const chain=r.chain.map((l,i)=>`<div class="link ${l.state}" data-i="${i}"><b>${esc(l.label)}</b><small>${esc(l.note)}</small>${l.refs.length?`<small class="mut">${l.refs.length} row${l.refs.length>1?'s':''} ↗</small>`:''}</div>`).join('');
+const slug=ref=>String(ref??'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+
+const I18N={
+  en:{
+    title:'Paid, but nothing arrived.',
+    subtitle:"When a customer says 'I paid but nothing arrived', it checks the payment provider, orders, credits and mail in one pass, shows where the chain broke, and drafts your reply.",
+    sponsors:'Zetaris · Meterless Nightshift · NVIDIA Nemotron',
+    placeholder:'Paste the customer\'s message, e.g. “Hi, I paid for the Standard pack but nothing showed up. Order ord_0901.”',
+    go:'Investigate',
+    examples:'Try an example message',
+    emptyHint:'Paste a customer message (include their email or order number), or pick an example below.',
+    investigating:'Investigating…',
+    errNetwork:'Could not reach the server. Check that the app is running, then try again.',
+    errHttp:'Something went wrong talking to the server. Refresh the page and try again.',
+    noOrderHint:"Paste the customer's message including their email or order number.",
+    reply:'Reply to the customer',
+    copy:'Copy',
+    copied:'Copied',
+    fix:'What to fix',
+    needsApproval:'needs your approval',
+    investigation:'How the agent found it',
+    namedOrder:'Named order',
+    chain:'Money chain',
+    why:'Why',
+    verified:'Verified',
+    unverified:'Not verified',
+    evidence:'Evidence: raw rows',
+    trace:'Trace',
+    citationOk:'Citation check: passed',
+    citationFail:'Citation check: failed → verifier text used',
+    citationSkip:'Citation check: model step skipped (no endpoint)',
+    evidenceBtn:'Dispute evidence bundle',
+    rows:'rows',
+    ms:'ms',
+    answeredBy:m=>'Answered by: '+m+' on this machine',
+    templateExplain:'Explanation: template (no model connected)',
+    dataZetaris:'Data: Zetaris',
+    dataLocal:'Data: local files',
+  },
+  ko:{
+    title:'결제했는데 아무것도 안 왔어요.',
+    subtitle:"고객이 '결제했는데 아무것도 안 왔어요'라고 하면, 결제·주문·크레딧·메일을 한 번에 살펴 어디에서 끊겼는지 보여 주고 답장 초안까지 만듭니다.",
+    sponsors:'Zetaris · Meterless Nightshift · NVIDIA Nemotron',
+    placeholder:'고객 메시지를 붙여 넣으세요. 예: “스탠다드 팩 결제했는데 아무것도 안 보여요. 주문번호 ord_0901.”',
+    go:'조사하기',
+    examples:'예시 메시지 써보기',
+    emptyHint:'고객 메시지(이메일 또는 주문번호 포함)를 붙여 넣거나, 아래 예시를 고르세요.',
+    investigating:'조사 중…',
+    errNetwork:'서버에 연결하지 못했습니다. 앱이 실행 중인지 확인한 뒤 다시 시도하세요.',
+    errHttp:'서버와 통신 중 문제가 생겼습니다. 페이지를 새로고침한 뒤 다시 시도하세요.',
+    noOrderHint:'고객 메시지에 이메일이나 주문번호를 포함해 붙여 넣으세요.',
+    reply:'고객에게 보낼 답장',
+    copy:'복사',
+    copied:'복사됨',
+    fix:'고칠 것',
+    needsApproval:'승인 필요',
+    investigation:'에이전트가 찾은 과정',
+    namedOrder:'지정한 주문',
+    chain:'결제 연결고리',
+    why:'이유',
+    verified:'확인됨',
+    unverified:'확인되지 않음',
+    evidence:'근거: 원본 행',
+    trace:'추적',
+    citationOk:'인용 검사: 통과',
+    citationFail:'인용 검사: 실패 → 검증기 문구 사용',
+    citationSkip:'인용 검사: 모델 단계 생략(엔드포인트 없음)',
+    evidenceBtn:'분쟁용 근거 묶음',
+    rows:'행',
+    ms:'ms',
+    answeredBy:m=>'답변: '+m+' (이 기기)',
+    templateExplain:'설명: 템플릿(연결된 모델 없음)',
+    dataZetaris:'데이터: Zetaris',
+    dataLocal:'데이터: 로컬 파일',
+  }
+};
+
+const EXAMPLES={
+  1:{label:'I paid but my credits never came — ord_0901',send:'I paid but my credits never came — ord_0901'},
+  2:{label:'I paid but the order never confirmed — ord_0902',send:'I paid but the order never confirmed — ord_0902'},
+  3:{label:'I was granted the same credits twice — ord_0903',send:'I was granted the same credits twice — ord_0903'},
+  4:{label:'Credits arrived but I never got an email — ord_0904',send:'Credits arrived but I never got an email — ord_0904'},
+  5:{label:'I thought I paid but nothing showed up — ord_0905',send:'I thought I paid but nothing showed up — ord_0905'},
+  6:{label:'I paid but nothing arrived — liam.patel906@example.com',send:'liam.patel906@example.com'},
+};
+
+let lang='en', lastResult=null, casesCache=[];
+
+function t(){return I18N[lang]||I18N.en;}
+function loadLang(){
+  try{const s=localStorage.getItem('ui-lang');if(s==='en'||s==='ko')lang=s;}catch(_){}
+}
+function saveLang(){
+  try{localStorage.setItem('ui-lang',lang);}catch(_){}
+}
+
+function applyChrome(){
+  const i=t();
+  document.documentElement.lang=lang==='ko'?'ko':'en';
+  document.title=i.title.replace(/\.$/,'');
+  $('#title').textContent=i.title;
+  $('#subtitle').textContent=i.subtitle;
+  $('#sponsors').textContent=i.sponsors;
+  $('#msg').placeholder=i.placeholder;
+  $('#go').textContent=i.go;
+  $('#lang').innerHTML=`<button type="button" class="ghost${lang==='en'?' on':''}" data-lang="en">EN</button><button type="button" class="ghost${lang==='ko'?' on':''}" data-lang="ko">한국어</button>`;
+  document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;saveLang();applyChrome();renderSamples();if(lastResult)render(lastResult);});
+  const eh=$('#empty-hint');
+  if(eh.dataset.show==='1')eh.textContent=i.emptyHint;
+  renderSamples();
+}
+
+function statusLine(r){
+  const i=t();
+  const be=String(r.backend||'');
+  const data=be?( /zetaris/i.test(be)?i.dataZetaris:i.dataLocal):'';
+  if(!r.ok)return data;
+  const parts=[];
+  if(r.llm==='none'||!r.llm)parts.push(i.templateExplain);
+  else parts.push(i.answeredBy(r.llm));
+  if(data)parts.push(data);
+  if(r.elapsed_ms!=null)parts.push(r.elapsed_ms+' '+i.ms);
+  return parts.join(' · ');
+}
+
+function goToRef(ref){
+  if(!ref)return;
+  const details=$('#evidence');
+  if(details&&!details.open)details.open=true;
+  const el=document.getElementById('row-'+slug(ref));
+  if(!el)return;
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+  setTimeout(()=>el.classList.remove('flash'),1500);
+}
+
+function linkifyExplain(text){
+  return esc(text).replace(/\[([a-z_]+:[^\]]+)\]/gi,(_,ref)=>`<a class="cite" href="#row-${esc(slug(ref))}" data-ref="${esc(ref)}">[${esc(ref)}]</a>`);
+}
+
+function renderSamples(){
+  const i=t();
+  if(!casesCache.length){$('#samples').innerHTML='';return;}
+  $('#samples').innerHTML=`<span class="label">${esc(i.examples)}</span>`+casesCache.map(c=>{
+    const ex=EXAMPLES[c.case]||{label:c.title,send:'order '+String(c.order_id||'')};
+    return `<button type="button" class="ghost" data-send="${esc(ex.send)}">${esc(ex.label)}</button>`;
+  }).join('');
+  document.querySelectorAll('#samples button').forEach(b=>b.onclick=()=>{
+    $('#msg').value=b.dataset.send;$('#empty-hint').hidden=true;$('#empty-hint').dataset.show='';run();
+  });
+}
+
+async function loadCases(){
+  try{
+    const res=await fetch('/api/cases');
+    if(!res.ok)throw new Error('http');
+    casesCache=await res.json();
+  }catch(_){casesCache=[];}
+  renderSamples();
+}
+
+async function run(){
+  const i=t();
+  const message=$('#msg').value.trim();
+  const hint=$('#empty-hint');
+  if(!message){
+    hint.hidden=false;hint.dataset.show='1';hint.textContent=i.emptyHint;$('#status').textContent='';return;
+  }
+  hint.hidden=true;hint.dataset.show='';
+  $('#status').textContent=i.investigating;
+  $('#go').disabled=true;
+  try{
+    const res=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+    if(!res.ok){
+      lastResult=null;
+      $('#out').innerHTML=`<div class="card"><div class="headline">${esc(i.errHttp)}</div><p class="hint">${esc(i.emptyHint)}</p></div>`;
+      $('#status').textContent='';
+      return;
+    }
+    const r=await res.json();
+    lastResult=r;
+    $('#status').textContent=statusLine(r);
+    render(r);
+  }catch(_){
+    lastResult=null;
+    $('#out').innerHTML=`<div class="card"><div class="headline">${esc(i.errNetwork)}</div><p class="hint">${esc(i.emptyHint)}</p></div>`;
+    $('#status').textContent='';
+  }finally{
+    $('#go').disabled=false;
+  }
+}
+
+function renderSteps(steps){
+  const i=t();
+  if(!Array.isArray(steps)||!steps.length)return'';
+  const items=steps.map(s=>{
+    const bits=[`<div>${esc(s.thought||'')}</div>`];
+    if(s.tool){
+      const args=s.args!=null?(typeof s.args==='string'?s.args:JSON.stringify(s.args)):'';
+      bits.push(`<div class="tool">${esc(s.tool)}${args?` ${esc(args)}`:''}${s.rows!=null?` · ${esc(s.rows)} ${esc(i.rows)}`:''}${s.error?' · error':''}</div>`);
+    }
+    if(s.done||s.order_id)bits.push(`<div class="mut">${esc(i.namedOrder)}: <b>${esc(s.order_id||'—')}</b></div>`);
+    if(s.ms!=null)bits.push(`<div class="mut">${esc(s.ms)} ${esc(i.ms)}</div>`);
+    return `<li>${bits.join('')}</li>`;
+  }).join('');
+  return `<div class="card"><h2>${esc(i.investigation)}</h2><ol class="timeline">${items}</ol></div>`;
+}
+
+function render(r){
+  const i=t();
+  if(!r.ok){
+    $('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div><p class="hint">${esc(i.noOrderHint)}</p></div>`;
+    return;
+  }
+  const chain=r.chain.map((l,idx)=>`<div class="link ${esc(l.state)}" data-i="${esc(idx)}" tabindex="0" role="button"><b>${esc(l.label)}</b><small>${esc(l.note)}</small>${l.refs.length?`<small class="mut">${esc(l.refs.length)} ${esc(i.rows)} ↗</small>`:''}</div>`).join('');
   const cited=new Set(r.chain.flatMap(l=>l.refs));
-  const rows=Object.entries(r.rows).map(([t,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${t} <span class="tag">${rs.length}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${CSS.escape(x.ref)}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
-  $('#out').innerHTML=`<div class="card"><div class="headline">${esc(r.headline)}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div><div class="chain">${chain}</div></div>
-  <div class="card two"><div><h2>Why</h2><p>${esc(r.explanation).replace(/\[([a-z_]+:[^\]]+)\]/g,'<a href="#row-$1" style="color:var(--acc)">[$1]</a>')}</p>
-   <h2>Verified</h2><ul>${r.verified.map(v=>`<li>${esc(v)}</li>`).join('')}</ul><h2>Not verified</h2><ul>${r.unverified.map(v=>`<li>${esc(v)}</li>`).join('')||'<li class="mut">—</li>'}</ul>
-   <p class="mut" style="font-size:12px">Citation check: ${r.citation_check.checked?(r.citation_check.ok?'passed':'failed → verifier text used'):'model step skipped (no endpoint)'}</p></div>
-  <div><h2>Next actions</h2><h3 style="font-size:14px;margin:8px 0 4px">Reply to the customer</h3><pre>${esc(r.customer_reply)}</pre>
-   <h3 style="font-size:14px;margin:8px 0 4px">Fix <span class="tag">needs your approval</span></h3><pre>${esc(r.fix_action)}</pre>
-   <button class="ghost" onclick="evidence()">Dispute evidence bundle</button></div></div>
-  <div class="card rows"><h2>Raw rows (cited rows highlighted)</h2>${rows}</div>
-  <div class="card"><h2>Trace</h2><ul>${r.trace.map(t=>`<li><b>${esc(t.step)}</b> — ${esc(t.detail)} <span class="mut">${t.ms} ms</span></li>`).join('')}</ul></div>`;
-  document.querySelectorAll('.link').forEach(el=>el.onclick=()=>{const l=r.chain[el.dataset.i];if(l.refs[0]){const row=document.getElementById('row-'+l.refs[0]);if(row)row.scrollIntoView({behavior:'smooth',block:'center'});}});}
-async function evidence(){const message=$('#msg').value.trim();const t=await (await fetch('/api/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})})).text();const w=window.open('','_blank');w.document.write('<pre style="white-space:pre-wrap;font:13px/1.5 monospace;padding:20px">'+t.replace(/</g,'&lt;')+'</pre>');}
-$('#go').onclick=run;loadCases();
+  const rows=Object.entries(r.rows).map(([table,rs])=>rs.length?`<h3 style="margin:10px 0 4px;font-size:14px">${esc(table)} <span class="tag">${esc(rs.length)}</span></h3><table><tr>${Object.keys(rs[0]).filter(k=>k!=='ref').map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${rs.map(x=>`<tr class="${cited.has(x.ref)?'cited':''}" id="row-${esc(slug(x.ref))}">${Object.entries(x).filter(([k])=>k!=='ref').map(([,v])=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`:'').join('');
+  let citeNote=i.citationSkip;
+  if(r.citation_check&&r.citation_check.checked)citeNote=r.citation_check.ok?i.citationOk:i.citationFail;
+
+  $('#out').innerHTML=`
+  <div class="two">
+    <div class="card"><div class="card-head"><h2>${esc(i.reply)}</h2><button type="button" class="ghost" id="copy-reply">${esc(i.copy)}</button></div><pre id="reply-text">${esc(r.customer_reply)}</pre>
+      <div style="margin-top:10px"><button type="button" class="ghost" id="evidence-btn">${esc(i.evidenceBtn)}</button></div></div>
+    <div class="card"><div class="card-head"><h2>${esc(i.fix)} <span class="tag">${esc(i.needsApproval)}</span></h2></div><pre>${esc(r.fix_action)}</pre></div>
+  </div>
+  ${renderSteps(r.steps)}
+  <div class="card"><div class="headline">${esc(r.headline)}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div>
+    <h2 style="margin-top:12px">${esc(i.chain)}</h2><div class="chain">${chain}</div></div>
+  <div class="card"><h2>${esc(i.why)}</h2><p>${linkifyExplain(r.explanation)}</p>
+    <p class="mut" style="font-size:12px">${esc(citeNote)}</p></div>
+  <div class="card two"><div><h2>${esc(i.verified)}</h2><ul>${r.verified.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></div>
+    <div><h2>${esc(i.unverified)}</h2><ul>${r.unverified.map(v=>`<li>${esc(v)}</li>`).join('')||`<li class="mut">—</li>`}</ul></div></div>
+  <details class="card rows" id="evidence"><summary>${esc(i.evidence)}</summary>${rows}</details>
+  <details class="card" id="trace"><summary>${esc(i.trace)}</summary><ul>${(r.trace||[]).map(tr=>`<li><b>${esc(tr.step)}</b> — ${esc(tr.detail)} <span class="mut">${esc(tr.ms)} ${esc(i.ms)}</span></li>`).join('')}</ul></details>`;
+
+  const copyBtn=$('#copy-reply');
+  if(copyBtn)copyBtn.onclick=async()=>{
+    try{await navigator.clipboard.writeText(r.customer_reply);copyBtn.textContent=t().copied;setTimeout(()=>copyBtn.textContent=t().copy,1500);}catch(_){}
+  };
+  const evBtn=$('#evidence-btn');
+  if(evBtn)evBtn.onclick=()=>evidence();
+
+  document.querySelectorAll('.link').forEach(el=>{
+    const activate=()=>{const l=r.chain[+el.dataset.i];if(l&&l.refs[0])goToRef(l.refs[0]);};
+    el.onclick=activate;
+    el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();}};
+  });
+  document.querySelectorAll('a.cite').forEach(a=>{
+    a.onclick=e=>{e.preventDefault();goToRef(a.dataset.ref);};
+  });
+}
+
+async function evidence(){
+  const message=$('#msg').value.trim();
+  try{
+    const res=await fetch('/api/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+    const text=await res.text();
+    const w=window.open('','_blank');
+    if(w)w.document.write('<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 monospace;padding:20px">'+esc(text)+'</pre>');
+  }catch(_){
+    $('#status').textContent=t().errNetwork;
+  }
+}
+
+$('#go').onclick=run;
+$('#msg').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();run();}
+});
+loadLang();
+applyChrome();
+loadCases();
 </script></body></html>
