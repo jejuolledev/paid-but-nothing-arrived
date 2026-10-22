@@ -12,7 +12,7 @@ Lines are numbered for TTS (one audio file per line: N01.wav …). Times are tar
 | N06 | 1:00 | Reply card (Korean toggle briefly) and fix card | You get a reply in the customer’s language. It can’t promise refunds — money is a human decision. And a fix: move the credits, once the customer confirms. |
 | N07 | 1:12 | Approve → confirm dialog → chain turns green; “Fixed by you” before/after | Approve, and the fix runs. The chain turns green, and the fix goes into an audit log. |
 | N08 | 1:21 | Case 5: grey chain, “You were never charged” | And when nothing is broken, it says so: you were never charged. |
-| N09 | 1:28 | Zetaris: registered datasources and the order_journey layer; Nightshift Apps panel and a receipt | Under the hood: four sources registered in Zetaris and joined in one semantic layer. Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model. |
+| N09 | 1:28 | Zetaris: registered datasources and the order_journey layer; Nightshift Apps panel and a receipt | Under the hood: the shop's five record tables are registered in Zetaris and joined in one semantic layer, order journey. Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model. |
 | N10 | 1:46 | Measurements card | Six cases, rebuilt from real bugs in our own shop with synthetic data: six out of six right, every explanation cited. |
 | N11 | 1:55 | How-it-works picture, then title | Paid, but nothing arrived? Found in one pass. |
 

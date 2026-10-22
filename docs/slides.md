@@ -61,7 +61,7 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # How Zetaris was used
 
-- Five sources registered as datasources; semantic layer `order_journey` relates them on `order_id` / `payment_id` / `email`.
+- Five synthetic tables in one Postgres datasource (`demo_pg`), activated into the semantic layer `order_journey`, related on `order_id` / `payment_id` / `email`.
 - The agent sends SQL only. Nothing is copied. Every row carries `table:key`.
 - Same SQL on DuckDB for tests; backend name printed on every result.
 

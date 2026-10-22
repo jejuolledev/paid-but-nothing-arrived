@@ -11,7 +11,7 @@ const cards = {
 <p>This agent asks <b>one SQL door (Zetaris)</b>, walks the money chain, marks the one link that broke — with the raw rows that prove it — and a <b>local Nemotron on Meterless Nightshift</b> explains. Customer data never leaves the machine.</p>
 <span class="tag">Track 02 — The Agent That Can Explain Why</span> <span class="tag">all data synthetic</span>`,
   arch: `${css}<h1>How it is built</h1>
-<div class="row"><div class="box"><b>Zetaris — one SQL door</b>payments · orders · grants · server_logs · mail_events registered as datasources and related in the semantic layer <i>order_journey</i>. The agent sends SQL only; every row carries <i>table:key</i>.</div>
+<div class="row"><div class="box"><b>Zetaris — one SQL door</b>payments · orders · grants · server_logs · mail_events (one Postgres datasource) activated into the semantic layer <i>order_journey</i>. The agent sends SQL only; every row carries <i>table:key</i>.</div>
 <div class="box"><b>Meterless Nightshift + NVIDIA Nemotron</b>Local OpenAI-compatible runtime. Nemotron 3.5 Lightning explains, drafts the reply, phrases the fix — it never decides. Every sentence must cite a returned ref or it is rejected.</div></div>
 <div class="row"><div class="box"><b>Verifier decides</b>Deterministic five-link check: green / red / grey with refs. The model cannot override it. Fixes need human approval.</div>
 <div class="box"><b>Cursor</b>Project rules in <i>.cursor/rules</i>, agent sessions in <i>docs/cursor-sessions</i>.</div></div>
