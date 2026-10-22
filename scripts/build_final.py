@@ -12,7 +12,7 @@ D = ROOT / "docs/demo"
 PARTS, TMP = D / "final_parts", D / "final_parts/_seg"
 TMP.mkdir(parents=True, exist_ok=True)
 LIVE = next((D / "take_final").glob("page@*.webm"))          # Zetaris + Nightshift run (case 6)
-CASE5 = next((D / "take_0237_explainfail").glob("page@*.webm"))  # same setup; its case-5 part is clean
+CASE5 = LIVE  # the same run continues with case 5 (and a quoted foreign order number)
 OFF = next((D / "take_offline").glob("page@*.webm"))          # offline DuckDB run, used for the approve beat
 COMIC, ZUI, NUI = D.parent / "comic", D / "zetaris_ui", D / "nightshift_ui"
 W, H, FPS, LEAD, GAP = 1920, 1080, 30, 0.25, 0.5
@@ -56,13 +56,15 @@ def clip(video, a, b, secs, out, crop=None):
     run(["-ss", str(a), "-t", str(b - a), "-i", str(video), "-vf", vf, "-t", f"{secs:.3f}", *ENC, str(out)])
 
 
-vo = {k: D / "vo" / f"{k}.wav" for k in [f"N{i:02d}" for i in range(1, 12)]}
+LINES = ["N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08", "N08b", "N09", "N10", "N11"]
+vo = {k: D / "vo" / f"{k}.wav" for k in LINES}
 L = {k: dur(p) for k, p in vo.items()}
 slot = {k: L[k] + GAP for k in L}
 slot["N11"] += 1.5  # title card holds a moment after the last line
 
-f_live_result = frame(LIVE, 126.0, TMP / "live_result.png")       # chain + reply + fix + timeline on screen
-f_live_rows = frame(LIVE, 133.2, TMP / "live_rows.png")           # evidence rows, cited row highlighted
+f_live_result = frame(LIVE, 217.7, TMP / "live_result.png")       # chain + reply + fix + timeline on screen
+f_live_rows = frame(LIVE, 224.9, TMP / "live_rows.png")
+f_case5 = frame(LIVE, 412.5, TMP / "case5.png")                    # never charged + the ignored foreign order           # evidence rows, cited row highlighted
 CHAIN, REPLYFIX, TIMELINE, ROWS = (240, 0, 960, 540), (240, 250, 960, 540), (240, 360, 960, 540), (240, 360, 960, 540)
 
 # each line: list of (kind, args, seconds or None = fill the rest of the slot)
@@ -70,19 +72,21 @@ PLAN = {
     "N01": [("still", (COMIC / "panel_P1.png",), None)],
     "N02": [("still", (COMIC / "panel_P2.png",), 6.5), ("still", (COMIC / "panel_P3.png",), None)],
     "N03": [("clip", (LIVE, 0.6, 5.9), None, {"crop": (240, 60, 960, 540)})],
-    "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 124.4, 126.6), 2.2),
+    "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 216.05, 218.25), 2.2),
             ("still", (f_live_result,), None, {"crop": TIMELINE, "zoom": (1.0, 1.08)})],
     "N05": [("still", (COMIC / "panel_P5.png",), 3.5), ("still", (f_live_result,), 5.0, {"crop": CHAIN}),
-            ("clip", (LIVE, 132.4, 134.6), 2.2), ("still", (f_live_rows,), None, {"crop": ROWS, "zoom": (1.0, 1.05)})],
-    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 136.4, 139.7), None, {"crop": (240, 200, 960, 540)})],
+            ("clip", (LIVE, 224.05, 226.25), 2.2), ("still", (f_live_rows,), None, {"crop": ROWS, "zoom": (1.0, 1.05)})],
+    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 228.05, 231.35), None, {"crop": (240, 200, 960, 540)})],
     "N07": [("clip", (OFF, "approve-0.6", "after_fix+0.3"), None, {"crop": (240, 0, 960, 540)})],
-    "N08": [("clip", (CASE5, 193.3, 198.3), None, {"crop": (240, 0, 960, 540)})],
+    "N08": [("clip", (CASE5, 409.9, 412.5), None, {"crop": (240, 0, 960, 540)})],
+    "N08b": [("still", (f_case5,), 2.6, {"crop": (240, 0, 960, 540), "zoom": (1.0, 1.12)}),
+             ("still", (f_case5,), None, {"crop": (270, 520, 676, 380), "zoom": (1.0, 1.04)})],
     "N09": [("still", (ZUI / "01_home.png",), 3.6), ("still", (ZUI / "05_Semantic.png",), 3.4),
             ("still", (NUI / "02_lanes.png",), 4.0), ("still", (NUI / "01_cockpit.png",), None)],
     "N10": [("still", (PARTS / "card_measured.png",), None, {"zoom": (1.0, 1.02)})],
     "N11": [("still", (ROOT / "docs/how-it-works.png",), 2.6), ("still", (PARTS / "card_title.png",), None, {"zoom": (1.0, 1.0)})],
 }
-LIVE_LABEL = {"N03", "N04", "N05", "N06"}
+LIVE_LABEL = {"N03", "N04", "N05", "N06", "N08", "N08b"}
 
 off_marks = json.loads((D / "take_offline/marks.json").read_text())
 

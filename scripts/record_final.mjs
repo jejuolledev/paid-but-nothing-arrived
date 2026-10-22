@@ -11,7 +11,7 @@ const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, recordV
 const p = await ctx.newPage();
 const t0 = Date.now(); const marks = {};
 const mark = k => { marks[k] = +((Date.now() - t0) / 1000).toFixed(2); console.log(k, marks[k]); };
-const waitResult = async () => { await p.waitForFunction(() => /ms|ms ·|초/.test(document.querySelector('#status')?.textContent || '') && document.querySelector('#out')?.children.length > 0, null, { timeout: 300000 }); };
+const waitResult = async () => { await p.waitForFunction(() => /ms|ms ·|초/.test(document.querySelector('#status')?.textContent || '') && document.querySelector('#out')?.children.length > 0, null, { timeout: 480000 }); };
 p.on('dialog', d => d.accept());
 
 await p.goto(base); await p.waitForTimeout(1500); mark('home');

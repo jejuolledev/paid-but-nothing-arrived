@@ -77,10 +77,17 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # Product
 
-![w:560](demo/slide_case6.png) ![w:560](demo/slide_case5.png)
+![w:640](demo/slide_case6.png)
 
-Left: case 6 live through Zetaris — paid with one address, credits went to a typo; two red links, each with its rows. Right: case 5, grey chain — "Nothing is broken. You were never charged."
-All data synthetic. The five cases are bugs we found in our own checkout — two happened on real payments.
+Case 6, live through Zetaris: paid with one address, the order was saved under a typo (exmaple.com). Two red links, each with the rows that prove it; the reply asks the customer to confirm, the fix waits for approval.
+
+---
+
+# Product — when nothing is broken
+
+![w:640](demo/slide_case5.png)
+
+Case 5: grey chain, "You were never charged." The message also quoted another customer's order (ord_0903): not read, and the page says so. All data synthetic.
 
 ---
 

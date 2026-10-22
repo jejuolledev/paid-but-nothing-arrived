@@ -1,37 +1,28 @@
-# Submission form — copy-ready values (fill the URLs at submission time)
+# Submission form — values for hackathon.genai.works (Open Agent Hackathon 2026)
 
-Primary track: **02 — The Agent That Can Explain Why**
-Team: **MoaHub** (solo, Jeonggil Bae)
+The form has five fields: Track, Description (150–2000 characters), Video (link or upload), GitHub repository, Pitch deck (optional). Team: MoaHub (solo). One submission per track; this is the Track 02 entry.
 
-## Project name
+## Track
 ```
-Paid, but nothing arrived — the agent that finds the broken link
-```
-
-## One-line description
-```
-Your customer already has proof they paid. This agent finds yours: one SQL door (Zetaris) across the PSP ledger, orders, grants, server logs and mail events; a local Nemotron (Meterless Nightshift) explains the one link that broke, with the raw rows that prove it.
+Track 02 — The Agent That Can Explain Why
 ```
 
-## Description
+## Description (1888 characters)
 ```
-"I paid, but nothing arrived." Every online seller gets this message, and a slow answer turns into a card dispute. The evidence is never in one system: the payment provider knows the charge, the app database knows the order and the credits, the server log knows which calls happened, the mail provider knows whether the customer was told.
+"I paid 24,900 won and nothing arrived." Every small online seller gets this message, and a slow answer becomes a chargeback. The proof is split across four systems: the payment provider, the orders database, the server logs and the mail provider.
 
-This agent asks one SQL door — Zetaris, with five synthetic tables standing in for those systems, registered and joined in a unified semantic layer called order_journey — and walks the money chain: card authorized → PSP paid → order confirmed → credits granted → mail delivered. A deterministic verifier marks each link green, red or grey and attaches the rows that decided it. A local NVIDIA Nemotron served by Meterless Nightshift then explains the broken link, drafts the reply to the customer and phrases the fix (which requires human approval). Every sentence the model writes must cite a row the tools actually returned; a citation check rejects anything else and shows that it did. The seller also gets a dispute evidence bundle.
+Paste the customer's message; their email is enough. NVIDIA Nemotron 3.5 Lightning, called through Meterless Nightshift on the seller's Mac, decides where to look: no order under this email, so who paid at the provider, which order is that payment, then the full journey. Every lookup is read-only SQL through one door, Zetaris, where the shop's five record tables (synthetic here) are joined in one semantic layer, order_journey. The sender's address decides whose records may be read: an order number that belongs to someone else is ignored, and the page says so.
 
-It also knows how to say "nothing is broken": when there is no charge at the provider, the chain stops grey and the answer is "You were never charged."
+A rule-based verifier, not the model, checks the money chain: card authorized, PSP paid, order confirmed, credits granted, mail delivered. Each link is green, red or grey, and every red link carries the rows that prove it. The model writes the explanation, which must cite those rows or is replaced by the verifier's text, and a reply in the customer's language that may not promise refunds. The fix comes from the verifier, needs the seller's approval (and the customer's confirmation when credits would move to another address), and goes into an audit log. When nothing is broken it says so: "You were never charged."
 
-All data is synthetic. The five seeded cases are bugs we found while auditing our own checkout — two of them happened on real payments — rebuilt with made-up records.
-```
+Before rows reach the model, the sender's address becomes CUSTOMER, other addresses are masked and card digits removed; every answer shows Nightshift's receipt of which model ran.
 
-## Demo video (1–4 min)
-```
-<YouTube URL>
+Measured on the final code with six cases rebuilt from bugs in our own shop: right order and broken link 6/6, explanations cited 6/6, the agent loop found the order itself 5/6, a cross-customer probe blocked; 16 automated tests. Built with Cursor. All data is synthetic.
 ```
 
-## Slide deck
+## Video
 ```
-<PDF link — docs/slides.pdf in the repository or a Drive link>
+<YouTube link of docs/demo/final_v2.mp4>
 ```
 
 ## GitHub repository
@@ -39,16 +30,12 @@ All data is synthetic. The five seeded cases are bugs we found while auditing ou
 https://github.com/jejuolledev/paid-but-nothing-arrived
 ```
 
-## How Zetaris and Meterless were integrated / Cursor / NVIDIA / what was unique
-Paste `docs/sponsor-tech.md` (sections in the order the form asks).
-
-## Pre-existing components
+## Pitch deck (optional)
 ```
-None of our product code. Open-source libraries only (see requirements.txt). All code in the repository was written inside the build window; the first commit is 2026-10-22 10:04 KST (01:04 UTC).
+https://github.com/jejuolledev/paid-but-nothing-arrived/blob/main/docs/slides.pdf
 ```
 
-## Notes for the person submitting
-- Make the repository public first: `gh repo edit jejuolledev/paid-but-nothing-arrived --visibility public --accept-visibility-change-consequences`
-- Upload the video to YouTube (public or unlisted), paste the link into README.md "Demo video", commit, push.
-- Export slides: `npx @marp-team/marp-cli docs/slides.md -o docs/slides.pdf` (or any Markdown→PDF), commit.
-- Log in to hackathon.genai.works **with the same method used on 10/18** (one account per participant).
+## Before submitting
+1. Make the repository public: `gh repo edit jejuolledev/paid-but-nothing-arrived --visibility public --accept-visibility-change-consequences`
+2. Upload `docs/demo/final_v2.mp4` to YouTube (public or unlisted), put the link in README.md "Demo video", commit, push.
+3. Paste the values above. Pre-existing components: none of our product code; open-source libraries only (see README).

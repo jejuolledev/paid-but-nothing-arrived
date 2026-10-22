@@ -28,6 +28,9 @@
  "N08": [
   "And when nothing is broken, it says so: you were never charged."
  ],
+ "N08b": [
+  "And if a message quotes someone else’s order number, that order is never read."
+ ],
  "N09": [
   "Under the hood: the shop’s five record tables are registered in Zetaris and joined in one semantic layer, order journey.",
   "Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model."
