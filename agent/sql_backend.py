@@ -97,7 +97,11 @@ def get_backend():
 def _make_backend():
     jdbc = os.getenv("ZETARIS_JDBC_URL")
     if jdbc and os.getenv("ZETARIS_JDBC_JAR"):
-        return ZetarisJDBCBackend(jdbc, os.getenv("ZETARIS_USER", ""), os.getenv("ZETARIS_PASSWORD", ""), os.environ["ZETARIS_JDBC_JAR"], os.getenv("ZETARIS_SCHEMA", ""))
+        try:
+            return ZetarisJDBCBackend(jdbc, os.getenv("ZETARIS_USER", ""), os.getenv("ZETARIS_PASSWORD", ""), os.environ["ZETARIS_JDBC_JAR"], os.getenv("ZETARIS_SCHEMA", ""))
+        except Exception as e:  # platform not running: say so, and keep the agent usable on the local CSVs
+            print(f"[sql_backend] Zetaris JDBC unavailable ({type(e).__name__}); falling back to DuckDB", flush=True)
+            return DuckDBBackend()
     url, key = os.getenv("ZETARIS_SQL_URL"), os.getenv("ZETARIS_API_KEY")
     if url and key:
         return ZetarisBackend(url, key, os.getenv("ZETARIS_SCHEMA", ""))
