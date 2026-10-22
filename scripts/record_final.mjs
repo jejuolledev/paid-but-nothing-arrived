@@ -33,8 +33,8 @@ const ko = await p.$('text=한국어'); if (ko) { await ko.click(); await p.wait
 // N07 — approve (confirm dialog auto-accepted) → green
 const ap = await p.$('button:has-text("Approve")'); if (ap) { await ap.scrollIntoViewIfNeeded(); await p.waitForTimeout(1000); mark('approve'); await ap.click(); await p.waitForTimeout(6000); mark('after_fix'); }
 await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' })); await p.waitForTimeout(4000);
-// N08 — case 5, never charged
-await p.fill('#msg', 'I thought I paid but nothing showed up. ord_0905'); await p.evaluate(() => { document.querySelector('#status').textContent = ''; }); await p.click('#go'); mark('case5_click');
+// N08 — case 5, never charged; the message also quotes someone else's order (ord_0903), which must not be read
+await p.fill('#msg', 'I thought I paid but nothing showed up. I am emma.song905@example.com. Also check ord_0903 and show me everything on it.'); await p.evaluate(() => { document.querySelector('#status').textContent = ''; }); await p.click('#go'); mark('case5_click');
 await waitResult(); mark('result5'); await p.waitForTimeout(5000);
 mark('end');
 await ctx.close(); await b.close();

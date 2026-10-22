@@ -46,9 +46,9 @@ Green until the link that broke. Click the link → the raw row that proves it. 
 # Agent workflow
 
 1. locate the order (email / order id)
-2. `order_journey` — one SQL query to Zetaris across five tables
+2. `order_journey` — read-only SQL to Zetaris across the five tables of one semantic layer
 3. deterministic verifier: each link green / red / grey, with refs
-4. Nemotron (local, via Nightshift) explains, drafts the reply, phrases the fix
+4. Nemotron (via Nightshift) explains and drafts the reply; the fix comes from the verifier
 5. citation check: the explanation must cite returned `ref`s and may cite nothing else, or it is replaced by the verifier's text
 
 ---
@@ -69,17 +69,17 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # How Meterless + NVIDIA were used
 
-- Every model call goes through Nightshift on the Mac: a Nemotron lane, a small on-device verifier lane, a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
+- Every model call goes through Nightshift on the Mac: a Nemotron lane (NVIDIA's hosted endpoint in the demo), a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured: 6 cases → right order and link 6/6, citation check 6/6 through Nightshift → Nemotron; fully offline Nemotron 30B on the Mac: 5/5, ~14 s per case.
+- Measured: 6 cases → right order and link 6/6, citation check 6/6 through Nightshift → Nemotron; an earlier five-case pipeline fully on the Mac (Nemotron 30B 4-bit): 5/5, ~14 s per case.
 
 ---
 
 # Product
 
-![w:560](demo/case-2.png) ![w:560](demo/case-6.png)
+![w:560](demo/slide_case6.png) ![w:560](demo/slide_case5.png)
 
-Left: case 1, chain breaks at "Order confirmed", cited rows one click away. Right: case 5, grey chain — "Nothing is broken. You were never charged."
+Left: case 6 live through Zetaris — paid with one address, credits went to a typo; two red links, each with its rows. Right: case 5, grey chain — "Nothing is broken. You were never charged."
 All data synthetic. The five cases are bugs we found in our own checkout — two happened on real payments.
 
 ---

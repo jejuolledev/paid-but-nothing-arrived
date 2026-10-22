@@ -47,10 +47,11 @@ def frame(video, t, out):
     return out
 
 
-def clip(video, a, b, secs, out):
-    """Recorded screen from a to b, letterboxed; holds the last frame if the slot is longer."""
+def clip(video, a, b, secs, out, crop=None):
+    """Recorded screen from a to b (optionally a 16:9 crop of it), letterboxed; holds the last frame if the slot is longer."""
     hold = max(0.0, secs - (b - a))
-    vf = (f"fps={FPS},scale=-2:{H},pad={W}:{H}:(ow-iw)/2:0:color={BG},setsar=1,"
+    pre = f"crop={crop[2]}:{crop[3]}:{crop[0]}:{crop[1]}," if crop else ""
+    vf = (f"fps={FPS},{pre}scale=-2:{H}:flags=lanczos,pad={W}:{H}:(ow-iw)/2:0:color={BG},setsar=1,"
           f"tpad=stop_mode=clone:stop_duration={hold:.3f}")
     run(["-ss", str(a), "-t", str(b - a), "-i", str(video), "-vf", vf, "-t", f"{secs:.3f}", *ENC, str(out)])
 
@@ -68,14 +69,14 @@ CHAIN, REPLYFIX, TIMELINE, ROWS = (240, 0, 960, 540), (240, 250, 960, 540), (240
 PLAN = {
     "N01": [("still", (COMIC / "panel_P1.png",), None)],
     "N02": [("still", (COMIC / "panel_P2.png",), 6.5), ("still", (COMIC / "panel_P3.png",), None)],
-    "N03": [("clip", (LIVE, 0.6, 5.9), None)],
+    "N03": [("clip", (LIVE, 0.6, 5.9), None, {"crop": (240, 60, 960, 540)})],
     "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 124.4, 126.6), 2.2),
             ("still", (f_live_result,), None, {"crop": TIMELINE, "zoom": (1.0, 1.08)})],
     "N05": [("still", (COMIC / "panel_P5.png",), 3.5), ("still", (f_live_result,), 5.0, {"crop": CHAIN}),
             ("clip", (LIVE, 132.4, 134.6), 2.2), ("still", (f_live_rows,), None, {"crop": ROWS, "zoom": (1.0, 1.05)})],
-    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 136.7, 139.8), None)],
-    "N07": [("clip", (OFF, "approve-0.6", "after_fix+0.3"), None)],
-    "N08": [("clip", (CASE5, 193.3, 198.3), None)],
+    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 136.4, 139.7), None, {"crop": (240, 200, 960, 540)})],
+    "N07": [("clip", (OFF, "approve-0.6", "after_fix+0.3"), None, {"crop": (240, 0, 960, 540)})],
+    "N08": [("clip", (CASE5, 193.3, 198.3), None, {"crop": (240, 0, 960, 540)})],
     "N09": [("still", (ZUI / "01_home.png",), 3.6), ("still", (ZUI / "05_Semantic.png",), 3.4),
             ("still", (NUI / "02_lanes.png",), 4.0), ("still", (NUI / "01_cockpit.png",), None)],
     "N10": [("still", (PARTS / "card_measured.png",), None, {"zoom": (1.0, 1.02)})],
@@ -106,7 +107,7 @@ for k, parts in PLAN.items():
         else:
             v, a, b = args
             a, b = resolve(a), resolve(b)
-            clip(v, a, b, secs, out)
+            clip(v, a, b, secs, out, **opts)
         segs.append(out)
     timeline.append((k, t, slot[k]))
     t += slot[k]

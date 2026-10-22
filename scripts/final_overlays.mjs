@@ -14,6 +14,7 @@ const LINES = {
   N06: 'You get a reply in the customer’s language. It can’t promise refunds — money is a human decision. And a fix: move the credits, once the customer confirms.',
   N07: 'Approve, and the fix runs. The chain turns green, and the fix goes into an audit log.',
   N08: 'And when nothing is broken, it says so: you were never charged.',
+  N08b: 'And if a message quotes someone else’s order number, that order is never read.',
   N09: 'Under the hood: the shop’s five record tables are registered in Zetaris and joined in one semantic layer, order journey. Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model.',
   N10: 'Six cases, rebuilt from real bugs in our own shop with synthetic data: six out of six right, every explanation cited.',
   N11: 'Paid, but nothing arrived? Found in one pass.',

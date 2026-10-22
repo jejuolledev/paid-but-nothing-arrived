@@ -20,7 +20,7 @@ SYSTEM = (
     "customer_reply (written BY the seller TO the customer, <=90 words, plain and kind; state what happened and what you will do; "
     "if nothing was charged say so clearly; never ask the customer to investigate; no internal refs; "
     "never say a fix is done or under way — the seller has not approved it yet; if the chain shows credits went to a "
-    "different address, ask the customer to confirm that address and say the credits move after they confirm), "
+    "different address, ask the customer to confirm that the address they paid with is theirs (name it) and say the credits move after they confirm; never ask them for some other address), "
     "fix_action (one imperative sentence for the seller)."
 )
 
@@ -87,6 +87,15 @@ def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
     return (len(cited) > 0 and not bad), bad
 
 
+def _order_belongs(tools, order_id: str, email: str) -> bool:
+    o = tools.find_orders(order_id=order_id)
+    if not o:
+        return False
+    if o[0]["email"].lower() == email.lower():
+        return True
+    return any(p["payment_id"] == o[0].get("payment_id") for p in tools.find_payments(email))
+
+
 def investigate(message: str, email: str = "", order_id: str = "", backend=None, use_model: bool = True) -> dict:
     from .sql_backend import get_backend
     db = backend or get_backend()
@@ -99,11 +108,19 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
     # 1. locate the order (email or order id; fall back to an id mentioned in the message)
     if order_id and not re.fullmatch(r"ord_\d{4}", order_id): order_id = ""
     if email and not re.fullmatch(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", email): email = ""
-    if not order_id and not email:
-        m = re.search(r"ord_\d{4}", message); order_id = m.group(0) if m else ""
-        m = re.search(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", message); email = m.group(0) if m else email
+    if not order_id:
+        m = re.search(r"ord_\d{4}", message or ""); order_id = m.group(0) if m else ""
+    if not email:
+        m = re.search(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", message or ""); email = m.group(0) if m else ""
     if not order_id and not email:
         return {"ok": False, "headline": "Add the order number (ord_0000) or the customer's email to the message.", "trace": [], "backend": db.name}
+    # The sender's address decides whose records may be read. An order number written in the message is only
+    # used if it belongs to that sender (order address or payer address); otherwise it is ignored and said so.
+    ignored_order = ""
+    if email and order_id and not _order_belongs(tools, order_id, email):
+        ignored_order, order_id = order_id, ""
+        mark("sender_scope", f"{ignored_order} is not this sender's order — ignored")
+    sender_unverified = bool(order_id and not email)
     client, model = _client() if use_model else (None, None)
     steps, loop_finding = [], ""
     target = None
@@ -178,6 +195,8 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             texts["fix_action"] = verdict.suggested_fix  # the fix is decided by the verifier, never by the model
             if not _reply_ok(texts.get("customer_reply", ""), verdict):
                 texts["customer_reply"] = _template_reply(verdict, lang); citation["reply_replaced"] = True
+            if ok and re.search(r"refund|compensat|discount|voucher|환불|보상|할인", texts.get("explanation", ""), re.I):
+                ok = False  # money is a person's decision; a steered explanation falls back to the verifier's text
             if not ok:
                 texts["explanation"] = verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs)
                 citation["replaced_with_verifier_text"] = True
@@ -191,6 +210,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
         mark("template_texts", {"failed": "model call failed — verifier text used", "verifier-only": "re-check after a fix — verifier only"}.get(llm_used, "no LLM endpoint configured — verifier text used"))
 
     return {"ok": True, "order_id": target["order_id"], "email": target["email"], "headline": verdict.headline,
+            "ignored_order": ignored_order, "sender_unverified": sender_unverified,
             "chain": [{"name": l.name, "label": LABELS[l.name], "state": l.state, "note": l.note, "refs": l.refs} for l in verdict.links],
             "broken": verdict.broken, "verified": verdict.verified, "unverified": verdict.unverified,
             "explanation": texts["explanation"], "customer_reply": texts["customer_reply"], "fix_action": texts["fix_action"],
@@ -213,6 +233,8 @@ def _reply_ok(reply: str, v) -> bool:
     if v.broken == "account_mismatch" and (not re.search(r"confirm|확인해", reply, re.I)
                                            or re.search(r"(are|am|we're|i'm) (now )?moving|right away|already moved|옮기고 있|옮겼", reply, re.I)):
         return False  # credits move only after the customer confirms and the seller approves
+    if re.search(r"where you('d| would) like|which (email|address)|(send|give|tell) (us|me) (the|your|an?) (new |other |different )?(email|address)|another (email|address)|new (email|address)|원하시는 (주소|이메일)|다른 (주소|이메일)을 알려", reply, re.I):
+        return False  # the fix only moves credits to the payer's own address; never invite an arbitrary one
     key = v.broken if v.broken in REPLY_MUST else None
     if key is None and "never charged" not in v.headline.lower() and v.broken is None:
         return bool(re.search(r"in your account|went through|everything|이용권|계정", reply, re.I))
@@ -225,13 +247,13 @@ def _template_reply(v, lang: str = "en") -> str:
     if v.broken is None and "never charged" in v.headline.lower():
         return "Thank you for writing. I checked our payment provider: no charge was made on your card for this order, so nothing is missing and nothing will be billed. Here is a fresh checkout link whenever you are ready."
     if v.broken == "order_created":
-        return "Thank you for your patience. I can confirm your payment went through on our provider's side. Our system did not complete your order after that — that is our fault, not yours. I am releasing your credits now and you will receive a confirmation email shortly."
+        return "Thank you for your patience. I can confirm your payment went through on our provider's side. Our system did not complete your order after that — that is our fault, not yours. I will release your credits as soon as this is fixed on our side, and you will get a confirmation email."
     if v.broken == "credit_granted":
         return "Thank you for writing. Your payment and order are fine. I found that the credits were issued twice by mistake; I will keep your purchased credits in place and correct the duplicate on our side. Nothing further is needed from you."
     if v.broken == "account_mismatch":
         return "Thank you for writing, and sorry for the worry. Your payment went through. The order was saved under a slightly different email address than the one you paid with, so the credits and the confirmation went there. Could you confirm this is your address? As soon as you do, I will move the credits to your account."
     if v.broken == "mail_delivered":
-        return "Thank you for your patience. Your credits are already in your account — our confirmation email failed to send, so you were never told. Please log in and check your balance; I am resending the confirmation now."
+        return "Thank you for your patience. Your credits are already in your account — our confirmation email failed to send, so you were never told. Please log in and check your balance; I will resend the confirmation as well."
     return "Thank you for writing. I checked every step of your order and everything went through; your credits are in your account."
 
 
@@ -240,7 +262,7 @@ def _template_reply_ko(v) -> str:
     if v.broken is None and "never charged" in v.headline.lower():
         return "문의해 주셔서 감사합니다. 결제 대행사를 확인한 결과 이번 주문에 대해 카드에 청구된 내역이 없습니다. 빠진 이용권도 없고 추가 청구도 되지 않습니다. 준비되시면 새 결제 링크로 다시 진행해 주세요."
     if v.broken == "order_created":
-        return "기다려 주셔서 감사합니다. 결제 대행사 기준으로는 결제가 정상 완료된 것을 확인했습니다. 이후 주문을 마무리하지 못한 것은 저희 쪽 문제입니다. 지금 이용권을 지급하고 있으며, 곧 확인 메일을 보내 드리겠습니다."
+        return "기다려 주셔서 감사합니다. 결제 대행사 기준으로는 결제가 정상 완료된 것을 확인했습니다. 이후 주문을 마무리하지 못한 것은 저희 쪽 문제입니다. 저희 쪽에서 바로잡는 대로 이용권을 지급하고 확인 메일을 보내 드리겠습니다."
     if v.broken == "credit_granted":
         return "문의해 주셔서 감사합니다. 결제와 주문은 정상입니다. 이용권이 실수로 두 번 지급된 것을 확인했고, 구매하신 이용권은 그대로 두고 중복분만 정리하겠습니다. 고객님께서 추가로 하실 일은 없습니다."
     if v.broken == "account_mismatch":

@@ -24,7 +24,7 @@ button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,79,.5)}50%{box-shadow:0 0 0 8px rgba(255,77,79,0)}}
 @keyframes flashRow{0%,100%{background:transparent}20%,80%{background:rgba(91,141,239,.35)}}
 .flash{animation:flashRow 1.5s ease}
-h2{font-size:18px;margin:0 0 6px}.headline{font-size:22px;font-weight:600}.mut{color:var(--mut)}
+h2{font-size:18px;margin:0 0 6px}.headline{font-size:22px;font-weight:600}.warnline{margin-top:6px;font-size:13px;color:#f3c969;background:rgba(243,201,105,.08);border:1px solid rgba(243,201,105,.35);border-radius:6px;padding:4px 8px}.mut{color:var(--mut)}
 pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;margin:0}
 .prose{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;margin:0;font:inherit;line-height:1.5}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:720px){.two{grid-template-columns:1fr}}
@@ -132,7 +132,7 @@ const I18N={
     citationSkip:'Citation check: model step skipped (no endpoint)',
     evidenceBtn:'Dispute evidence bundle',
     ms:'ms',
-    answeredBy:m=>'Answered by: '+m+' on this machine',
+    answeredBy:m=>'Answered by: '+m,
     templateExplain:'Explanation: template (no model connected)',
     failedExplain:'Explanation: verifier text (model call failed twice)',
     recheckExplain:'Re-checked by the verifier after your fix',
@@ -157,6 +157,8 @@ const I18N={
     after:'After',
     actionId:'Action',
     confirmAddress:'The customer must confirm the address they paid with. Did they confirm?',
+    ignoredOrder:o=>`${o} in the message belongs to another customer, so it was not read.`,
+    senderUnverified:'No sender address in the message. Check that this order\'s email is the person who wrote to you before you send the reply.',
   },
   ko:{
     title:'결제했는데 아무것도 안 왔어요.',
@@ -189,7 +191,7 @@ const I18N={
     citationSkip:'인용 검사: 모델 단계 생략(엔드포인트 없음)',
     evidenceBtn:'분쟁용 근거 묶음',
     ms:'ms',
-    answeredBy:m=>'답변: '+m+' (이 기기)',
+    answeredBy:m=>'답변: '+m,
     templateExplain:'설명: 템플릿(연결된 모델 없음)',
     failedExplain:'설명: 검증기 문장(모델 호출 두 번 실패)',
     recheckExplain:'수정 후 검증기가 다시 확인함',
@@ -214,6 +216,8 @@ const I18N={
     after:'이후',
     actionId:'액션',
     confirmAddress:'고객이 결제한 이메일 주소가 맞다고 확인해 주셨나요?',
+    ignoredOrder:o=>`메시지의 ${o}는 다른 고객의 주문이라 읽지 않았습니다.`,
+    senderUnverified:'메시지에 보낸 사람 주소가 없습니다. 답장을 보내기 전에 이 주문의 이메일이 문의한 사람과 같은지 확인하세요.',
   }
 };
 
@@ -462,7 +466,7 @@ function render(r, opts){
 
   $('#out').innerHTML=`
   ${renderFixCard()}
-  <div class="card"><div class="headline">${esc(trHeadline(r.headline))}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div>
+  <div class="card"><div class="headline">${esc(trHeadline(r.headline))}</div><div class="mut">order ${esc(r.order_id)} · ${esc(r.email)}</div>${r.ignored_order?`<div class="warnline">${esc(i.ignoredOrder(r.ignored_order))}</div>`:''}${r.sender_unverified?`<div class="warnline">${esc(i.senderUnverified)}</div>`:''}
     <div class="chain">${chain}</div></div>
   <div class="two">
     <div class="card"><div class="card-head"><h2>${esc(i.reply)}</h2><button type="button" class="ghost" id="copy-reply">${esc(i.copy)}</button></div>
