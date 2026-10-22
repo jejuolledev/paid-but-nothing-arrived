@@ -73,6 +73,7 @@ def _mask(text: str, customer_email: str) -> str:
     """Last pass over everything sent to the model: no full address survives, wherever it appears."""
     from .agent_loop import Aliaser, EMAIL_RE
     al = Aliaser(customer_email)
+    text = re.sub(r"•••• ?\d{4}", "•••• ****", text)  # card digits never reach the model
     return EMAIL_RE.sub(lambda m: al.email(m.group(0)), text)
 
 
@@ -104,15 +105,23 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None)
     client, model = _client()
     steps, loop_finding = [], ""
     target = None
-    # 1a. with a model: the model decides which records to pull (tools are read-only, ids are validated)
-    if client and email and not order_id:
+    # 1a. with a model: the model decides which records to pull (tools are read-only and scoped to the
+    #     sender's own trail; ids are validated). If the seller pasted an order id, the sender is that order's address.
+    if client and (email or order_id):
         try:
             from .agent_loop import investigate_loop
-            res = investigate_loop(client, model, message, email, tools)
-            steps, loop_finding = res["steps"], res["finding"]
-            mark("agent_loop", f"{len(steps)} step(s), named {res['order_id'] or 'nothing'}")
-            if res["ok"]:
-                target = tools.find_orders(order_id=res["order_id"])[0]
+            seed = ""
+            if order_id and not email:
+                o0 = tools.find_orders(order_id=order_id)
+                email, seed = (o0[0]["email"], order_id) if o0 else ("", "")
+            elif order_id:
+                seed = order_id
+            if email:
+                res = investigate_loop(client, model, message, email, tools, seed_order=seed)
+                steps, loop_finding = res["steps"], res["finding"]
+                mark("agent_loop", f"{len(steps)} step(s), named {res['order_id'] or 'nothing'}")
+                if res["ok"]:
+                    target = tools.find_orders(order_id=res["order_id"])[0]
         except Exception as e:
             mark("agent_loop", f"failed: {type(e).__name__}"[:120])
     # 1b. without a model (or if it found nothing): our own lookup, then the PSP ledger by payer address

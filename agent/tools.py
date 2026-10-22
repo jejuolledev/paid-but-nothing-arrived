@@ -49,9 +49,9 @@ class Tools:
         return {
             "orders": o,
             "payments": _tag("payments", self.db.query(f"SELECT * FROM payments WHERE {pay_where} ORDER BY created_at")),
-            "grants": _tag("grants", self.db.query(f"SELECT * FROM grants WHERE order_id = {oid} OR (lower(email) = lower({em}) AND reward_key = {lit('reward_key', o[0]['reward_key'])}) ORDER BY created_at")),
+            "grants": _tag("grants", self.db.query(f"SELECT * FROM grants WHERE order_id = {oid} ORDER BY created_at")),
             "server_logs": _tag("server_logs", self.db.query(f"SELECT * FROM server_logs WHERE order_id = {oid} ORDER BY ts")),
-            "mail_events": _tag("mail_events", self.db.query(f"SELECT * FROM mail_events WHERE order_tag = {oid} OR lower(to_address) = lower({em}) ORDER BY ts")),
+            "mail_events": _tag("mail_events", self.db.query(f"SELECT * FROM mail_events WHERE order_tag = {oid} ORDER BY ts")),
         }
 
     def find_payments(self, email: str) -> list[dict[str, Any]]:

@@ -84,19 +84,50 @@ def _parse(text: str) -> dict | None:
         return None
 
 
-def investigate_loop(client, model: str, message: str, customer_email: str, tools) -> dict:
+def investigate_loop(client, model: str, message: str, customer_email: str, tools, seed_order: str = "") -> dict:
     """Returns {order_id, finding, steps, seen_refs, ok}. `steps` is what the screen and the video show."""
     al = Aliaser(customer_email)
+    cust = (customer_email or "").lower()
+    # The model may only follow the sender's own trail: their address, payments made by it, and
+    # orders that belong to it (by order address or by payer). Anything else is refused, so a
+    # crafted message cannot steer the agent into another customer's records.
+    mine_pay: set[str] = set()
+    mine_ord: set[str] = {seed_order} if seed_order else set()  # the seller pasted this order id
+
+    def _addr(a):
+        if a.get("email", "CUSTOMER") != "CUSTOMER":
+            raise PermissionError("only CUSTOMER may be looked up")
+        return cust
+
+    def _owned_order(oid):
+        if oid not in mine_ord:
+            raise PermissionError("that order is not on this customer's trail")
+        return oid
+
+    def _note(rows):
+        for r in rows:
+            if r.get("ref", "").startswith("payments:") and (r.get("customer_email") or "").lower() == cust:
+                mine_pay.add(r["payment_id"])
+            if r.get("ref", "").startswith("orders:") and ((r.get("email") or "").lower() == cust or r.get("payment_id") in mine_pay):
+                mine_ord.add(r["order_id"])
+        return rows
+
+    def _pay(a):
+        pid = a.get("payment_id", "")
+        if pid not in mine_pay:
+            raise PermissionError("that payment was not made by this customer")
+        return pid
+
     calls = {
-        "find_orders": lambda a: tools.find_orders(email=al.arg(a.get("email", "")), order_id=a.get("order_id", "")),
-        "find_payments": lambda a: tools.find_payments(al.arg(a.get("email", ""))),
-        "order_for_payment": lambda a: tools.order_for_payment(a.get("payment_id", "")),
-        "order_journey": lambda a: tools.order_journey(a.get("order_id", "")),
-        "related_orders": lambda a: tools.related_orders(al.arg(a.get("email", ""))),
+        "find_orders": lambda a: _note(tools.find_orders(email=_addr(a))),
+        "find_payments": lambda a: _note(tools.find_payments(_addr(a))),
+        "order_for_payment": lambda a: _note(tools.order_for_payment(_pay(a))),
+        "order_journey": lambda a: tools.order_journey(_owned_order(a.get("order_id", ""))),
+        "related_orders": lambda a: _note(tools.related_orders(_addr(a))),
     }
     safe_msg = EMAIL_RE.sub(lambda m: al.email(m.group(0)), message[:2000])
     msgs = [{"role": "system", "content": SYSTEM},
-            {"role": "user", "content": f"Customer message: {safe_msg}\nThe customer wrote from: CUSTOMER"}]
+            {"role": "user", "content": f"Customer message: {safe_msg}\nThe customer wrote from: CUSTOMER" + (f"\nThe seller says the order is {seed_order}." if seed_order else "")}]
     steps, seen, seen_orders = [], set(), set()
     for _ in range(MAX_STEPS):
         t0 = time.time()
@@ -110,7 +141,7 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
             continue
         if act.get("done"):
             oid = act.get("order_id", "")
-            ok = oid in seen_orders
+            ok = oid in mine_ord
             steps.append({"thought": act.get("thought", ""), "done": True, "order_id": oid, "ms": int((time.time() - t0) * 1000), "receipt": receipt})
             return {"ok": ok, "order_id": oid if ok else "", "finding": act.get("finding", ""), "steps": steps, "seen_refs": sorted(seen)}
         name, args = act.get("tool", ""), act.get("args", {}) or {}
@@ -122,8 +153,8 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
             shown = {k: al.rows(v) for k, v in result.items()} if isinstance(result, dict) else al.rows(result)
             obs = json.dumps(shown, default=str)[:6000]
             steps.append({"thought": act.get("thought", ""), "tool": name, "args": args, "rows": len(rows), "ms": int((time.time() - t0) * 1000), "receipt": receipt})
-        except (KeyError, ValueError) as e:
-            obs = f"error: {type(e).__name__} — check the tool name and arguments"
+        except (KeyError, ValueError, PermissionError) as e:
+            obs = f"refused: {e}" if isinstance(e, PermissionError) else f"error: {type(e).__name__} — check the tool name and arguments"
             steps.append({"thought": act.get("thought", ""), "tool": name, "args": args, "error": True, "ms": int((time.time() - t0) * 1000)})
         msgs += [{"role": "assistant", "content": json.dumps(act)}, {"role": "user", "content": f"Result of {name}: {obs}"}]
     return {"ok": False, "order_id": "", "finding": "", "steps": steps, "seen_refs": sorted(seen)}

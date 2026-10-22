@@ -11,6 +11,7 @@ queries run against the synthetic CSVs through DuckDB with identical table names
 """
 from __future__ import annotations
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ class DuckDBBackend:
     def __init__(self, data_dir: Path = DATA_DIR):
         import duckdb  # local import keeps the Zetaris path dependency-free
         self.con = duckdb.connect(database=":memory:")
+        self.lock = threading.RLock()  # one connection, many request threads
         for t in TABLES:
             p = data_dir / f"{t}.csv"
             if not p.exists():
@@ -37,13 +39,15 @@ class DuckDBBackend:
         )
 
     def query(self, sql: str) -> list[dict[str, Any]]:
-        cur = self.con.execute(sql)
-        cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        with self.lock:
+            cur = self.con.execute(sql)
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
 
     def execute(self, sql: str) -> None:
         """Run a write statement (INSERT / UPDATE). Offline demo only."""
-        self.con.execute(sql)
+        with self.lock:
+            self.con.execute(sql)
 
 
 class ZetarisBackend:
@@ -79,11 +83,16 @@ class ZetarisJDBCBackend:
         import jaydebeapi
         self.con = jaydebeapi.connect("com.zetaris.lightning.jdbc.LightningDriver", jdbc_url, [user, password], jar)
         self.schema = schema
+        self._lock = threading.RLock()
 
     def query(self, sql: str) -> list[dict[str, Any]]:
         if self.schema:
             for t in TABLES:
                 sql = sql.replace(f" {t} ", f" {self.schema}.{t} ").replace(f" {t}\n", f" {self.schema}.{t}\n")
+        with self._lock:
+            return self._query(sql)
+
+    def _query(self, sql: str) -> list[dict[str, Any]]:
         cur = self.con.cursor()
         cur.execute(sql)
         cols = [d[0] for d in cur.description] if cur.description else []

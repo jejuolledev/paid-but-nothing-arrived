@@ -30,8 +30,23 @@ def _credits(reward_key: str) -> str:
     return m.group(1) if m else "0"
 
 
-def approve(order_id: str, approved_by: str = "seller", backend=None) -> dict:
-    """Apply the verifier's suggested fix for one order, audit it, then re-investigate."""
+class NeedsCustomerConfirmation(Exception):
+    """Moving credits to another address needs the customer's yes first."""
+
+
+def approve(order_id: str, approved_by: str = "seller", backend=None, customer_confirmed: bool = False) -> dict:
+    """Apply the verifier's suggested fix for one order, audit it, then re-investigate.
+    The whole check-then-write runs under the backend lock, so two clicks cannot both apply."""
+    from .sql_backend import get_backend
+    db = backend or get_backend()
+    lock = getattr(db, "lock", None)
+    if lock is None or not hasattr(db, "execute"):
+        raise ReadOnlyBackend(READONLY_MSG)
+    with lock:
+        return _approve(order_id, approved_by, db, customer_confirmed)
+
+
+def _approve(order_id: str, approved_by: str, backend, customer_confirmed: bool) -> dict:
     from .sql_backend import get_backend
     db = backend or get_backend()
     if not hasattr(db, "execute"):
@@ -45,9 +60,21 @@ def approve(order_id: str, approved_by: str = "seller", backend=None) -> dict:
         raise NothingToFix("Nothing to fix")
 
     kind = verdict.broken
+    if kind == "account_mismatch" and not customer_confirmed:
+        raise NeedsCustomerConfirmation("Ask the customer to confirm the address they paid with, then approve again.")
     o = journey["orders"][0]
     ts = _now()
-    applied = _apply(db, kind, order_id, oid_lit, o, journey, ts)
+    lock = getattr(db, "lock", None)
+    if lock is None:
+        raise ReadOnlyBackend(READONLY_MSG)
+    with lock:  # one fix at a time, all-or-nothing
+        db.execute("BEGIN TRANSACTION")
+        try:
+            applied = _apply(db, kind, order_id, oid_lit, o, journey, ts)
+            db.execute("COMMIT")
+        except Exception:
+            db.execute("ROLLBACK")
+            raise
     action_id = f"a_{order_id}_{ts.replace(':', '').replace('-', '')}"
     detail = applied["detail"]
     # approved_by is a short free-text label from the seller UI; keep it SQL-safe.
@@ -99,10 +126,7 @@ def _apply(db, kind: str, order_id: str, oid_lit: str, o: dict, journey: dict, t
         db.execute(
             f"INSERT INTO mail_events VALUES ('{mail_id}', {em}, 'sent', '{ts}', {oid_lit})"
         )
-        db.execute(
-            f"INSERT INTO mail_events VALUES ('{mail_id}', {em}, 'delivered', '{ts}', {oid_lit})"
-        )
-        return {"kind": kind, "detail": f"resent credit mail for {order_id}"}
+        return {"kind": kind, "detail": f"queued the credit mail again for {order_id} (offline demo: no real mail leaves this machine)"}
 
     if kind == "account_mismatch":
         pays = [p for p in journey["payments"] if p.get("status") == "PAID"]
@@ -115,9 +139,6 @@ def _apply(db, kind: str, order_id: str, oid_lit: str, o: dict, journey: dict, t
         mail_id = f"m_{order_id}_fix"
         db.execute(
             f"INSERT INTO mail_events VALUES ('{mail_id}', {em}, 'sent', '{ts}', {oid_lit})"
-        )
-        db.execute(
-            f"INSERT INTO mail_events VALUES ('{mail_id}', {em}, 'delivered', '{ts}', {oid_lit})"
         )
         return {"kind": kind, "detail": f"moved credits and mail to {payer}"}
 

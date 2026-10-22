@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env.local")
-from agent.actions import READONLY_MSG, NothingToFix, ReadOnlyBackend, approve  # noqa: E402
+from agent.actions import READONLY_MSG, NeedsCustomerConfirmation, NothingToFix, ReadOnlyBackend, approve  # noqa: E402
 from agent.investigator import investigate  # noqa: E402
 
 app = FastAPI(title="Paid, but nothing arrived")
@@ -25,6 +25,7 @@ class Ask(BaseModel):
 class ApproveBody(BaseModel):
     order_id: str
     approved_by: str = "seller"
+    customer_confirmed: bool = False
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -46,7 +47,9 @@ def api_investigate(ask: Ask):
 def api_approve(body: ApproveBody):
     """Apply a human-approved fix (DuckDB offline demo only). Zetaris answers 409."""
     try:
-        return JSONResponse(approve(body.order_id, body.approved_by))
+        return JSONResponse(approve(body.order_id, body.approved_by, customer_confirmed=body.customer_confirmed))
+    except NeedsCustomerConfirmation as e:
+        return PlainTextResponse(str(e), status_code=409)
     except ReadOnlyBackend:
         return PlainTextResponse(READONLY_MSG, status_code=409)
     except NothingToFix:
@@ -76,4 +79,5 @@ def evidence(ask: Ask):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "zetaris": bool(os.getenv("ZETARIS_SQL_URL") or os.getenv("ZETARIS_JDBC_URL")), "llm": bool(os.getenv("NIGHTSHIFT_BASE_URL") or os.getenv("OPENROUTER_API_KEY"))}
+    from agent.sql_backend import get_backend
+    return {"ok": True, "backend": get_backend().name, "llm_endpoint": bool(os.getenv("NIGHTSHIFT_BASE_URL") or os.getenv("LLM_BASE_URL"))}
