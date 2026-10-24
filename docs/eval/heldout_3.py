@@ -1,4 +1,4 @@
-# Held-out set 3, written 2026-10-25 by a separate agent that never saw the checker. Run once on commit 1104a5e: wrong caught 33/40, true wrongly rejected 3/20. Not tuned on — this is the published number.
+# Held-out set 3, written 2026-10-25 by a separate agent that never saw the checker. Never tuned on. Commit 1104a5e: 33/40 caught, 3/20 wrongly rejected; after fixing false rejections seen in a live Zetaris run (not this set): 32/40, 2/20.
 # Held-out set 3 for the claim checker. Built only from heldout/rows.json (ord_0901..ord_0906).
 
 WRONG = [

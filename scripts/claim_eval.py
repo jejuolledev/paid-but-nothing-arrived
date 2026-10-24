@@ -45,6 +45,12 @@ TRUE = [
     f"Order ord_0905 {O5} has status pending, no payment row, and credited 0.",                                 # model, Zetaris 00:12
     f"Credits have not been granted for order ord_0901 {O1}.",
     f"The order needs to be re-confirmed and credits granted {P1} {O1} {L1c}.",   # a recommendation, written by the model on Zetaris (23:05)
+    # written by the model on Zetaris (2026-10-25 01:26), rejected by the version that added time / month checks
+    f"Customer ord_0902 paid 9,900\u202fKRW ({P2[1:-1]}) and the PSP webhook PAID arrived ({'server_logs:2026-10-15T20:00:31Z@/api/payments/webhook'}), but order ord_0902 remained pending because the confirm call was never executed, so no credits or email were sent.",
+    f"Customer paid 44\u202f900\u202fKRW ({'payments:pay_0903'}) for order ord_0903 ({'orders:ord_0903'}), which is marked paid.",
+    f"Two grants ({G3[1:-1]}, {G3r[1:-1]}) each gave 60 credits because the initial confirm timed out and a manual retry repeated the grant.",
+    f"The reward email was delivered ({M3[1:-1]}), but the duplicate credit may have caused confusion.",
+    f"Order ord_0905 (ref {O5}) has status pending with no payment row, grants, or credited amount.",
     f"Order ord_0904 {O4 if (O4 := '[orders:ord_0904]') else ''} shows a confirmed 9900 KRW payment {P4} and 10 credits granted {G4}, but the credit email failed with a 500 error 'missing API key' {L4}.",
 ]
 FALSE = [

@@ -130,7 +130,7 @@ _STATES = [
     ("pay+", r"\b(?:paid|charged|went through)\b|결제[가는]?\s*(?:완료|정상|됐|되었)",
      lambda rows: _PAID(rows) or any(str(r.get("status", "")).lower() == "paid" for r in rows if r.get("ref", "").startswith("orders:"))
                   or any("paid" in str(r.get("message", "")).lower() for r in rows)),
-    ("grant-", r"\b(?:(?:never|not|n't)\s+(?:yet\s+)?(?:been\s+)?(?:granted|credited)|no credits(?: were)?(?: granted)?|credits (?:never|did not|didn't) (?:arrive|come)|credited\s*(?:=|:)?\s*0)\b|(?:지급|적립)되지\s*않|(?:지급|적립) 안",
+    ("grant-", r"\b(?:(?:never|not|n't)\s+(?:yet\s+)?(?:been\s+)?(?:granted|credited)|no credits(?: were)?(?: granted)?|credits (?:never|did not|didn't) (?:arrive|come)|credited\s*(?:=|:)?\s*0)\b|\bno\b[^.;]{0,40}\b(?:credited|granted)\b|(?:지급|적립)되지\s*않|(?:지급|적립) 안",
      lambda rows: not _GRANTED(rows)),
     ("grant+", r"(?:적립|지급)(?:됐|되었|했|돼)|\b(?:granted|credited|credits (?:are|were) (?:already )?in [\w' ]{0,25}account|received (?:the|their|your) credits)\b|지급(?:됐|되었|했)",
      lambda rows: _GRANTED(rows)),
@@ -249,6 +249,24 @@ def _time_claims(low: str, refs: list[str], ref_rows: dict) -> tuple[list[str], 
     return facts, missing
 
 
+_STATE_TABLE = {"pay+": ("payments:",), "pay-": ("payments:",), "paystate": ("payments:",), "ord+": ("orders:",), "ord-": ("orders:",),
+                "grant+": ("grants:", "orders:"), "grant-": ("grants:", "orders:"), "mail+": ("mail_events:",), "mail-": ("mail_events:",),
+                "bounce": ("mail_events:",), "twice": ("grants:",)}
+
+
+def _same_order(refs: list[str], ref_rows: dict) -> list[dict]:
+    """Every record of the order(s) the cited rows belong to (linked by order id, payment id or grant id)."""
+    keys = set()
+    for r in refs:
+        row = ref_rows.get(r, {})
+        keys |= {str(row.get(k)) for k in ("order_id", "payment_id") if row.get(k)}
+        m = re.search(r"ord_\d{4}", r)
+        if m:
+            keys.add(m.group(0))
+    return [dict(row, ref=ref) for ref, row in ref_rows.items()
+            if keys & {str(row.get("order_id")), str(row.get("payment_id"))} or any(k in ref for k in keys)]
+
+
 def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
     """Sentence by sentence, against the rows the same sentence cites (or, if it cites nothing, the rows cited
     elsewhere in the explanation): every 3+-digit number, email domain, record id (ord_/pay_/g_ord_/m_ord_) and
@@ -258,7 +276,7 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
     report, ok = [], True
     for sent in [x.strip() for x in re.split(r"(?<=[.!?])\s+|\n+", text) if x.strip()]:
         refs = [c.rstrip(".,;)") for c in REF_RE.findall(sent)] or cited_all
-        body = REF_RE.sub("", sent)
+        body = re.sub(r"[\u00a0\u202f\u2009]", " ", REF_RE.sub("", sent))  # models write 44\u202f900
         hay = " ".join(str(v) for r in refs for v in ref_rows.get(r, {}).values()).lower()
         low = body.lower()
         nums = _num_tokens(v for r in refs for v in ref_rows.get(r, {}).values())
@@ -297,7 +315,7 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
         for pat, need in _CAUSES.items():
             if re.search(pat, low):
                 facts.append(re.search(pat, low).group(0))
-                if not re.search(need, hay):
+                if not re.search(need, hay) and not re.search(need, " ".join(str(v) for r in _same_order(refs, ref_rows) for v in r.values()).lower()):
                     missing.append(re.search(pat, low).group(0))
         for a, b in _GRANT_COUNT.findall(low):
             tok = (a or b).lower(); n = _TIMES_N.get(tok) or int(tok)
@@ -311,7 +329,7 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
             if n not in nums:
                 missing.append(f"{q}{unit} 원")
         # a month (and day) named in the sentence must be the date of a cited row
-        for mname, day in re.findall(r"\b(" + "|".join(_MONTHS) + r")\s+(\d{1,2})?", low):
+        for mname, day in re.findall(r"\b(" + "|".join(_MONTHS) + r")\s+(\d{1,2})\b", low):  # "may" alone is a verb, not a month
             stamp = f"-{_MONTHS[mname]}-" + (f"{int(day):02d}" if day else "")
             facts.append(f"{mname} {day}".strip())
             if stamp not in hay:
@@ -324,7 +342,10 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
         # an endpoint named together with a cited log row must be that row's route
         logs = [ref_rows[r] for r in refs if r.startswith("server_logs:") and r in ref_rows]
         for word, route in _ROUTES.items():
-            if logs and re.search(r"\b" + word + r"\s+(?:endpoint|step|call|route|request|handler)\b", low) and not any(route in str(l.get("route", "")) for l in logs):
+            said = re.search(r"\b" + word + r"\s+(?:endpoint|step|call|route|request|handler)\b(?P<rest>[^.;]{0,25})", low)
+            if said and re.search(r"never|not |n't|skipped|missing", said.group("rest")):
+                continue  # "the confirm call was never executed" names an absence, not a cited row
+            if logs and said and not any(route in str(l.get("route", "")) for l in logs):
                 facts.append(word); missing.append(f"{word} (not the cited endpoint)")
         rows = [dict(ref_rows[r], ref=r) for r in refs if r in ref_rows]
         low = body.lower()
@@ -365,6 +386,10 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
             facts.append(m.group(0))
             # "twice" is a claim about the explanation as a whole: count grants cited anywhere in it
             scope = [dict(ref_rows[r], ref=r) for r in cited_all if r in ref_rows] if name == "twice" else rows
+            # if the sentence cites no row of the table this state lives in, the same order's records of that table decide
+            table = _STATE_TABLE.get(name)
+            if not holds(scope) and table and not any(r.startswith(table) for r in (cited_all if name == "twice" else refs)):
+                scope = [r for r in _same_order(refs, ref_rows) if r["ref"].startswith(table)]
             if not holds(scope):
                 missing.append(m.group(0))
         if missing:
