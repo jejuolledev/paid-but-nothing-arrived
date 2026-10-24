@@ -79,7 +79,7 @@ The agent's journey query in Zetaris's SQL Workspace: three datasources, one sta
 
 - Every model call goes through Nightshift on the Mac: a Nemotron lane (NVIDIA's hosted endpoint in the demo), a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured on the final code through Nightshift → Nemotron (hosted): right order and link 6/6, citation + claim check 6/6, loop named the order 5/6, cross-customer probe blocked; 19 automated tests.
+- Measured on Zetaris (three datasources) through Nightshift → Nemotron (hosted): right order and link 6/6, loop found the order 6/6, citation + claim check 6/6, cross-customer probe blocked; 20 automated tests.
 
 ---
 

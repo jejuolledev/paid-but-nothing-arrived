@@ -7,17 +7,17 @@ The form has five fields: Track, Description (150–2000 characters), Video (lin
 Track 02 — The Agent That Can Explain Why
 ```
 
-## Description (1946 characters)
+## Description (1943 characters)
 ```
-I run a small online shop, and the message I dread most is "I paid 24,900 won and nothing arrived." If I'm slow to answer, it turns into a chargeback. The trouble is that the answer is spread across four places: the payment provider, our orders database, the server logs and the mail provider.
+I run a small online shop, and the message I dread most is "I paid 24,900 won and nothing arrived." If I'm slow to answer, it turns into a chargeback. The answer is spread across four places: the payment provider, our orders database, the server logs and the mail provider.
 
-So I built an agent that does the digging for me. You paste the customer's message; their email is enough. NVIDIA Nemotron 3.5 Lightning (NVIDIA's hosted endpoint, called through Meterless Nightshift on my Mac) decides where to look next: no order under this email, so who actually paid at the provider, and which order does that payment belong to. Every lookup is read-only SQL through Zetaris, where the shop database, the payment provider's ledger and the mail provider's events are three datasources joined in one semantic layer. An order's whole history comes back from a single query, and the page shows the SQL behind every step. If a message quotes an order that belongs to someone else, that order isn't read, and the page says so.
+So I built an agent to do the digging. You paste the customer's message; their email is enough. NVIDIA Nemotron 3.5 Lightning (NVIDIA's hosted endpoint, called through Meterless Nightshift on my Mac) decides where to look next: no order under this email, so who actually paid at the provider, and which order does that payment belong to. Every lookup is read-only SQL through Zetaris, where the shop database, the payment provider's ledger and the mail provider's events are three datasources joined in one semantic layer. An order's whole history comes back from a single query, and the page shows the SQL behind every step. If a message quotes an order that belongs to someone else, that order isn't read, and the page says so.
 
-The model doesn't get the final word. A plain rule-based check walks the money chain (card authorized, provider paid, order confirmed, credits granted, mail delivered) and marks each step green, red or grey, with the exact rows that prove it. The model's explanation is checked sentence by sentence: every amount and address it states must be in the rows it cites, or it's replaced. It drafts a reply in the customer's language and can't promise refunds. The fix only runs after I click Approve, and it's logged. When nothing is wrong, it says so: "You were never charged."
+The model doesn't get the final word. A rule-based check walks the money chain (card authorized, provider paid, order confirmed, credits granted, mail delivered) and marks each step green, red or grey, with the exact rows that prove it. The model's explanation is checked sentence by sentence: every amount, address and payment or mail status it states must match the rows it cites, or it's replaced. It drafts a reply in the customer's language and can't promise refunds. The fix only runs after I click Approve, and it's logged. When nothing is wrong, it says so: "You were never charged."
 
 Addresses are masked and card digits removed before any record reaches the model.
 
-Tested on six cases rebuilt from real bugs in my own shop (all data synthetic): right order and broken step 6 of 6, every explanation passed the sentence check, and the agent found the order on its own in 5 of 6. 19 automated tests. Built with Cursor.
+Tested on Zetaris with six cases rebuilt from real bugs in my own shop (all data synthetic): right order and broken step 6 of 6, the agent found the order on its own 6 of 6, and every explanation passed the sentence check. 20 automated tests. Built with Cursor.
 ```
 
 ## Video
