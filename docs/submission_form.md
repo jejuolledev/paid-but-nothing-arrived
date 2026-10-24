@@ -7,17 +7,17 @@ The form has five fields: Track, Description (150–2000 characters), Video (lin
 Track 02 — The Agent That Can Explain Why
 ```
 
-## Description (1888 characters)
+## Description (1896 characters)
 ```
-"I paid 24,900 won and nothing arrived." Every small online seller gets this message, and a slow answer becomes a chargeback. The proof is split across four systems: the payment provider, the orders database, the server logs and the mail provider.
+I run a small online shop, and the message I dread most is "I paid 24,900 won and nothing arrived." If I'm slow to answer, it turns into a chargeback. The trouble is that the answer is spread across four places: the payment provider, our orders database, the server logs and the mail provider.
 
-Paste the customer's message; their email is enough. NVIDIA Nemotron 3.5 Lightning, called through Meterless Nightshift on the seller's Mac, decides where to look: no order under this email, so who paid at the provider, which order is that payment, then the full journey. Every lookup is read-only SQL through one door, Zetaris, where the shop's five record tables (synthetic here) are joined in one semantic layer, order_journey. The sender's address decides whose records may be read: an order number that belongs to someone else is ignored, and the page says so.
+So I built an agent that does the digging for me. You paste the customer's message; their email is enough. NVIDIA Nemotron 3.5 Lightning, called through Meterless Nightshift on my Mac, decides where to look next: there's no order under this email, so who actually paid at the provider, which order does that payment belong to, and what happened next. Every lookup is a read-only SQL query through Zetaris, where the shop's records are joined in one semantic layer. The agent can only follow the sender's own trail. If a message quotes someone else's order number, that order isn't read, and the page tells you.
 
-A rule-based verifier, not the model, checks the money chain: card authorized, PSP paid, order confirmed, credits granted, mail delivered. Each link is green, red or grey, and every red link carries the rows that prove it. The model writes the explanation, which must cite those rows or is replaced by the verifier's text, and a reply in the customer's language that may not promise refunds. The fix comes from the verifier, needs the seller's approval (and the customer's confirmation when credits would move to another address), and goes into an audit log. When nothing is broken it says so: "You were never charged."
+The model doesn't get the final word. A plain rule-based check walks the money chain (card authorized, provider paid, order confirmed, credits granted, mail delivered) and marks each step green, red or grey. Every red step comes with the exact rows that prove it. The model writes the explanation, which has to cite those rows, and drafts a reply in the customer's language. It can't promise refunds; that stays my call. The suggested fix only runs after I click Approve, and every fix is logged. And when nothing is wrong, it just says so: "You were never charged."
 
-Before rows reach the model, the sender's address becomes CUSTOMER, other addresses are masked and card digits removed; every answer shows Nightshift's receipt of which model ran.
+Before any record reaches the model, the customer's address is replaced, other addresses are masked and card digits are removed.
 
-Measured on the final code with six cases rebuilt from bugs in our own shop: right order and broken link 6/6, explanations cited 6/6, the agent loop found the order itself 5/6, a cross-customer probe blocked; 16 automated tests. Built with Cursor. All data is synthetic.
+I tested it on six cases rebuilt from real bugs in my own shop (all data here is synthetic). It found the right order and the broken step in 6 of 6, every explanation cited real rows, and the agent tracked down the order on its own in 5 of 6. There are 16 automated tests. Built with Cursor.
 ```
 
 ## Video
