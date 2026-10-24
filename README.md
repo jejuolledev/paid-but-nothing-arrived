@@ -42,13 +42,17 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
 - Docker (we used colima with Rosetta on Apple Silicon)
 
 ## Setup
+**Quick try — no Zetaris, no model, about 2 minutes.** The same SQL runs on DuckDB over the synthetic CSVs; the verifier, the chain, cited rows, approve-and-fix with the audit log and the evidence bundle all work; explanations and replies come from the verifier's templates.
 ```bash
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python data/gen_synthetic.py          # 4 synthetic sources + 6 seeded cases
-cp .env.example .env.local                       # fill Zetaris / Nightshift values (see below)
-.venv/bin/python -m pytest -q                    # seeded cases, injection and approval tests
-.venv/bin/uvicorn app.main:app --port 8765       # open http://127.0.0.1:8765
+.venv/bin/python data/gen_synthetic.py          # 5 synthetic sources + 6 seeded cases
+.venv/bin/python -m pytest -q                    # 16 tests: seeded cases, cross-customer, approval
+.venv/bin/uvicorn app.main:app --port 8765       # open http://127.0.0.1:8765 and click a seeded case
 ```
+Try case 6 with only the payer's address: `Hi, I paid 24,900 won yesterday but my credits never came. liam.patel906@example.com`.
+
+**Full run — Zetaris + Meterless Nightshift + NVIDIA Nemotron** (what the demo video shows): `cp .env.example .env.local` and fill the values below, then start the app the same way. If Nightshift is not running, the page says "no model reachable" and falls back to the verifier's text.
+
 Zetaris: `zetaris/register.sql` registers the synthetic Postgres database as a datasource and activates its five tables into the `order_journey` semantic layer. Nightshift: turn the hotspot on, copy the local address and key into `.env.local` (`NIGHTSHIFT_BASE_URL`, `NIGHTSHIFT_API_KEY`).
 
 ## Usage

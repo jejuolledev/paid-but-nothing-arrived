@@ -135,6 +135,7 @@ const I18N={
     answeredBy:m=>'Answered by: '+m,
     templateExplain:'Explanation: template (no model connected)',
     failedExplain:'Explanation: verifier text (model call failed twice)',
+    unreachableExplain:'Explanation: verifier text (no model reachable — start Nightshift, or leave NIGHTSHIFT_BASE_URL empty)',
     recheckExplain:'Re-checked by the verifier after your fix',
     dataZetaris:'Data: Zetaris',
     dataLocal:'Data: local files',
@@ -195,6 +196,7 @@ const I18N={
     answeredBy:m=>'답변: '+m,
     templateExplain:'설명: 템플릿(연결된 모델 없음)',
     failedExplain:'설명: 검증기 문장(모델 호출 두 번 실패)',
+    unreachableExplain:'설명: 검증기 문장(연결된 모델 없음 — Nightshift를 켜거나 NIGHTSHIFT_BASE_URL을 비우세요)',
     recheckExplain:'수정 후 검증기가 다시 확인함',
     dataZetaris:'데이터: Zetaris',
     dataLocal:'데이터: 로컬 파일',
@@ -308,6 +310,7 @@ function statusLine(r){
   const parts=[];
   if(r.llm==='verifier-only')parts.push(i.recheckExplain);
   else if(r.llm==='failed')parts.push(i.failedExplain);
+  else if(r.llm==='unreachable')parts.push(i.unreachableExplain);
   else if(r.llm==='none'||!r.llm)parts.push(i.templateExplain);
   else parts.push(i.answeredBy(r.llm));
   if(data)parts.push(data);

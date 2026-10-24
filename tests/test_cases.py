@@ -17,7 +17,7 @@ def test_seeded_cases_resolve_to_the_right_link():
         assert r["broken"] == c["broken_link"], (c["case"], r["headline"])
         red = [l for l in r["chain"] if l["state"] == "red"]
         assert all(l["refs"] for l in red), "every red link must cite rows"
-        assert "[" in r["explanation"] or r["llm"] in ("none", "failed")
+        assert "[" in r["explanation"] or r["llm"] in ("none", "failed", "unreachable")
 
 def test_healthy_order_is_green_end_to_end():
     r = investigate("where are my credits? order ord_0001")

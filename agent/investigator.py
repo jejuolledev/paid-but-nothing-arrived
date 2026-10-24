@@ -203,11 +203,12 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             mark("llm_explain", f"{model} citations_ok={ok}")
         except Exception as e:  # keep the demo honest: show that the model step failed
             mark("llm_explain", f"failed: {type(e).__name__}: {e}"[:200])
-            llm_used = "failed"
+            # nothing listening at the configured address (e.g. Nightshift not running) is not a model failure
+            llm_used = "unreachable" if "Connection" in type(e).__name__ else "failed"
     if texts is None:
         texts = {"explanation": verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs),
                  "customer_reply": _template_reply(verdict, lang), "fix_action": verdict.suggested_fix}
-        mark("template_texts", {"failed": "model call failed — verifier text used", "verifier-only": "re-check after a fix — verifier only"}.get(llm_used, "no LLM endpoint configured — verifier text used"))
+        mark("template_texts", {"failed": "model call failed — verifier text used", "unreachable": "no model reachable — verifier text used", "verifier-only": "re-check after a fix — verifier only"}.get(llm_used, "no LLM endpoint configured — verifier text used"))
 
     return {"ok": True, "order_id": target["order_id"], "email": target["email"], "headline": verdict.headline,
             "ignored_order": ignored_order, "sender_unverified": sender_unverified,
