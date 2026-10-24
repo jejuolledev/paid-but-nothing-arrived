@@ -99,11 +99,16 @@ _FACT_NUM = re.compile(r"\b\d[\d,]{2,}\b")            # amounts, codes, years: 3
 _FACT_DOMAIN = re.compile(r"@([\w-]+(?:\.[\w-]+)+)")    # the domain of an address (masked or not)
 # state words a sentence may claim, and what the cited rows must show for each
 _STATES = [
-    (r"\b(failed|declined|not paid|never paid|no charge|never charged|wasn't charged|not charged)\b",
+    # a payment that did not happen: only when the sentence says so about the payment / charge / card
+    (r"\b(?:payment|charge|card)\b[^.;]{0,30}\b(?:failed|declined)\b|\b(?:never charged|no charge|not charged|wasn't charged|never paid|not paid)\b",
      lambda rows: not any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith("payments:"))),
     (r"\b(paid|charged|went through)\b",
      lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith(("payments:", "orders:")))
                   or any("paid" in str(r.get("message", "")).lower() for r in rows)),
+    # anything else that "failed" / errored: some cited row must show a failure (a value, an HTTP 4xx/5xx, a bounce)
+    (r"\b(?:failed|failure|error)\b",
+     lambda rows: any("fail" in " ".join(str(v).lower() for v in r.values()) or "error" in str(r.get("message", "")).lower()
+                      or str(r.get("http_status", "0"))[:1] in ("4", "5") or str(r.get("event", "")).lower() == "bounced" for r in rows)),
     (r"\bbounced?\b", lambda rows: any(str(r.get("event", "")).lower() == "bounced" for r in rows)),
     (r"\b(twice|duplicate|double)\b", lambda rows: sum(1 for r in rows if r.get("ref", "").startswith("grants:")) >= 2),
     (r"\brefund(ed)?\b", lambda rows: False),  # nothing in the data is a refund
