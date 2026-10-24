@@ -41,6 +41,7 @@ TRUE = [
     f"30 credits were granted to the order address {G6}, and the reward email bounced {M6}.",
     f"결제는 정상 완료되었습니다 {P6}. 안내 메일은 반송되었습니다 {M6}.",
     f"Payment pay_0906 of 24,900 KRW was recorded PAID {P6}; order ord_0906 granted 30 credits {G6}, but the reward email bounced because the order used a different address than the payer {O6} {M6}.",
+    f"The order needs to be re-confirmed and credits granted {P1} {O1} {L1c}.",   # a recommendation, written by the model on Zetaris (23:05)
     f"Order ord_0904 {O4 if (O4 := '[orders:ord_0904]') else ''} shows a confirmed 9900 KRW payment {P4} and 10 credits granted {G4}, but the credit email failed with a 500 error 'missing API key' {L4}.",
 ]
 FALSE = [

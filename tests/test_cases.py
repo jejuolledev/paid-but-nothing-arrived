@@ -246,4 +246,4 @@ def test_card_digits_never_reach_the_model(monkeypatch):
 def test_claim_check_eval_catches_all_wrong_sentences():
     out = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve().parent.parent / "scripts/claim_eval.py")],
                          capture_output=True, text=True, check=True).stdout
-    assert "wrong sentences caught 30/30" in out and "wrongly rejected 0/12" in out
+    assert "wrong sentences caught 30/30" in out and "wrongly rejected 0/13" in out

@@ -159,6 +159,9 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
             if not any(str(r.get("credits", "")) == n for r in rows):
                 missing.append(f"{n} credits")
         hit = {name for name, pat, _ in _STATES if re.search(pat, low)}
+        # a recommendation ("needs to be granted", "should re-check", "해야") states no fact about the data
+        if re.search(r"\b(?:needs? to|should|must|has to|have to|will need|to be done|recommend)\b|해야|필요합니다", low):
+            hit &= {"refund"}  # a promised refund is still checked
         for name, pat, holds in _STATES:
             if name not in hit or _NEG_OF.get(name) in hit:  # "never charged" is not also a claim of "charged"
                 continue
@@ -266,7 +269,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             from .agent_loop import _parse
             for attempt in (1, 2):  # the hosted endpoint sometimes times out or returns no JSON; one retry
                 try:
-                    resp = client.chat.completions.create(model=model, temperature=0.2, max_tokens=4000, reasoning_effort=os.getenv("LLM_REASONING", "none"),
+                    resp = client.chat.completions.create(model=model, temperature=0.2, max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4000")), reasoning_effort=os.getenv("LLM_REASONING", "none"),
                         messages=[{"role": "system", "content": SYSTEM + lang_note},
                                   {"role": "user", "content": user_payload}])
                     texts = _parse(resp.choices[0].message.content or "")
