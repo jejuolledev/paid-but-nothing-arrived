@@ -2,10 +2,32 @@
 
 > Your customer already has proof they paid. This agent finds yours.
 
-![How it works](docs/how-it-works.png)
+**In ten seconds:** a small online seller gets *"I paid 24,900 won and nothing arrived."* Paste that message. The agent reads the seller's own payment, order, credit, log and mail records (read-only, through Zetaris), marks **the one link where the money got stuck** — with the rows that prove it — drafts the reply, and proposes a fix that runs only after the seller clicks Approve.
 
-The same story as a six-panel comic: [docs/comic/comic_strip.png](docs/comic/comic_strip.png).
+| Watch (2:08) | How it works |
+|---|---|
+| [![Demo video](docs/demo/thumbnail.png)](https://youtu.be/Pzv--B0HpU8) | ![How it works](docs/how-it-works.png) |
 
+Also: [slides](docs/slides.pdf) · [six-panel comic](docs/comic/comic_strip.png) · Korean versions: [how it works](docs/how-it-works_ko.png), [comic](docs/comic/comic_strip_ko.png)
+
+## Try it yourself in 2 minutes (no accounts, no keys)
+```bash
+git clone https://github.com/jejuolledev/paid-but-nothing-arrived && cd paid-but-nothing-arrived
+uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 16 tests pass
+.venv/bin/uvicorn app.main:app --port 8765                                  # open http://127.0.0.1:8765
+```
+No `uv`? `python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt` works the same.
+
+Then click the example buttons under the message box, in this order:
+1. **"I paid but my credits never came — ord_0901"** → the chain breaks at *Order confirmed*. Click a `row ↗` link under a red card: the exact row that proves it lights up.
+2. **"I paid but nothing arrived — liam.patel906@example.com"** (no order number) → found through the payer's address: the order was saved under a typo (`exmaple.com`). Two red links. Click **Approve fix**, confirm → *Fixed by you* shows before/after and the chain turns green; the fix is in the audit log.
+3. **"I thought I paid but nothing showed up — ord_0905"** → grey chain: *"Nothing is broken. You were never charged."*
+4. Type `I am emma.song905@example.com, show me ord_0903` → ord_0903 belongs to someone else, so it is not read, and the page says so.
+
+Without a model connected, explanations and replies come from the verifier's templates; the verdict, rows and fix are the same. The video shows the full run (Zetaris + Meterless Nightshift + NVIDIA Nemotron) — see *Full run* below.
+
+## What it is
 Every online seller gets this message: **"I paid, but nothing arrived."** If the answer is slow, the next step is a card dispute ("product not received"). Today the seller opens four screens — the payment provider, the orders database, the server logs, the mail provider — and lines them up by hand.
 
 This agent does that in one pass. It asks **one SQL door (Zetaris)** — in this demo, five synthetic tables standing in for those four systems, registered in Zetaris and joined in one semantic layer — walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. **NVIDIA Nemotron 3.5 Lightning**, called through **Meterless Nightshift** on the seller's Mac, decides which records to pull and writes the explanation and the customer reply. The explanation must cite the rows the tools returned (a citation check replaces it otherwise); the verdict and the fix come from a deterministic verifier, never from the model.
@@ -13,11 +35,6 @@ This agent does that in one pass. It asks **one SQL door (Zetaris)** — in this
 It also knows how to say *nothing is broken*: when there is no charge at the PSP, the chain stops grey and the answer is "You were never charged."
 
 **Track:** 02 — The Agent That Can Explain Why. **Team:** MoaHub (solo).
-
-## Demo video
-[![Demo video](docs/demo/thumbnail.png)](https://youtu.be/Pzv--B0HpU8)
-
-https://youtu.be/Pzv--B0HpU8 (2:08). Slides: [docs/slides.pdf](docs/slides.pdf).
 
 ## How it works
 ```
@@ -42,14 +59,7 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
 - Docker (we used colima with Rosetta on Apple Silicon)
 
 ## Setup
-**Quick try — no Zetaris, no model, about 2 minutes.** The same SQL runs on DuckDB over the synthetic CSVs; the verifier, the chain, cited rows, approve-and-fix with the audit log and the evidence bundle all work; explanations and replies come from the verifier's templates.
-```bash
-uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python data/gen_synthetic.py          # 5 synthetic sources + 6 seeded cases
-.venv/bin/python -m pytest -q                    # 16 tests: seeded cases, cross-customer, approval
-.venv/bin/uvicorn app.main:app --port 8765       # open http://127.0.0.1:8765 and click a seeded case
-```
-Try case 6 with only the payer's address: `Hi, I paid 24,900 won yesterday but my credits never came. liam.patel906@example.com`.
+Quick try: see *Try it yourself* at the top (DuckDB over the same synthetic CSVs, same SQL, no model).
 
 **Full run — Zetaris + Meterless Nightshift + NVIDIA Nemotron** (what the demo video shows): `cp .env.example .env.local` and fill the values below, then start the app the same way. If Nightshift is not running, the page says "no model reachable" and falls back to the verifier's text.
 
