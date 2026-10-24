@@ -97,6 +97,17 @@ def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
 
 _FACT_NUM = re.compile(r"\b\d[\d,]{2,}\b")            # amounts, codes, years: 3+ digits
 _FACT_DOMAIN = re.compile(r"@([\w-]+(?:\.[\w-]+)+)")    # the domain of an address (masked or not)
+# state words a sentence may claim, and what the cited rows must show for each
+_STATES = [
+    (r"\b(failed|declined|not paid|never paid|no charge|never charged|wasn't charged|not charged)\b",
+     lambda rows: not any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith("payments:"))),
+    (r"\b(paid|charged|went through)\b",
+     lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith(("payments:", "orders:")))
+                  or any("paid" in str(r.get("message", "")).lower() for r in rows)),
+    (r"\bbounced?\b", lambda rows: any(str(r.get("event", "")).lower() == "bounced" for r in rows)),
+    (r"\b(twice|duplicate|double)\b", lambda rows: sum(1 for r in rows if r.get("ref", "").startswith("grants:")) >= 2),
+    (r"\brefund(ed)?\b", lambda rows: False),  # nothing in the data is a refund
+]
 
 
 def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
@@ -111,6 +122,16 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
         facts = [n.replace(",", "") for n in _FACT_NUM.findall(body)] + _FACT_DOMAIN.findall(body)
         hay = " ".join(str(v) for r in refs for v in ref_rows.get(r, {}).values()).lower()
         missing = [f for f in facts if f.lower() not in hay]
+        rows = [dict(ref_rows[r], ref=r) for r in refs if r in ref_rows]
+        low = body.lower()
+        negated = re.search(_STATES[0][0], low)
+        for pat, holds in _STATES:
+            m = re.search(pat, low)
+            if not m or (pat is _STATES[1][0] and negated):  # "never charged" is not a claim of "charged"
+                continue
+            facts.append(m.group(0))
+            if not holds(rows):
+                missing.append(m.group(0))
         if missing:
             ok = False
         report.append({"sentence": sent, "refs": refs, "facts": facts, "unsupported": missing})
@@ -118,12 +139,15 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
 
 
 def _order_belongs(tools, order_id: str, email: str) -> bool:
-    o = tools.find_orders(order_id=order_id)
+    # a pre-check, not part of the investigation: query directly so the logged SQL shows each lookup once
+    from .tools import lit
+    o = tools.db.query(f"SELECT email, payment_id FROM orders WHERE order_id = {lit('order_id', order_id)}")
     if not o:
         return False
-    if o[0]["email"].lower() == email.lower():
+    if str(o[0]["email"]).lower() == email.lower():
         return True
-    return any(p["payment_id"] == o[0].get("payment_id") for p in tools.find_payments(email))
+    pays = tools.db.query(f"SELECT payment_id FROM payments WHERE lower(customer_email) = lower({lit('email', email)})")
+    return any(p["payment_id"] == o[0].get("payment_id") for p in pays)
 
 
 def investigate(message: str, email: str = "", order_id: str = "", backend=None, use_model: bool = True, lang: str = "") -> dict:
@@ -131,7 +155,8 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
     db = backend or get_backend()
     tools, trace, t0 = Tools(db), [], time.time()
     # reply language: what the page asks for (the seller's language toggle), else the language of the message
-    lang = lang if lang in ("en", "ko") else ("ko" if re.search(r"[가-힣]", message or "") else "en")
+    # reply language: a Korean message gets a Korean reply; otherwise the page's language toggle decides
+    lang = "ko" if re.search(r"[가-힣]", message or "") else (lang if lang in ("en", "ko") else "en")
 
     def mark(step, detail):
         trace.append(Trace(step, detail, int((time.time() - t0) * 1000)))
@@ -192,7 +217,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
         target = next((o for o in orders if not (o["status"] == "paid" and o["credited"] == "1")), orders[0])
 
     # 2. journey + 3. deterministic verification (the part that is never delegated to a model)
-    journey = tools.order_journey(target["order_id"]); mark("order_journey", f"{sum(len(v) for v in journey.values())} rows from 5 sources")
+    journey = tools.order_journey(target["order_id"]); mark("order_journey", f"one query; {sum(len(v) for v in journey.values())} rows split back into {sum(1 for v in journey.values() if v)} of the 5 tables")
     verdict = verify(journey); mark("verify_chain", f"broken={verdict.broken}")
     refs = {r["ref"] for rows in journey.values() for r in rows}
 
@@ -291,7 +316,7 @@ def _template_reply(v, lang: str = "en") -> str:
     if v.broken == "credit_granted":
         return "Thank you for writing. Your payment and order are fine. I found that the credits were issued twice by mistake; I will keep your purchased credits in place and correct the duplicate on our side. Nothing further is needed from you."
     if v.broken == "account_mismatch":
-        return "Thank you for writing, and sorry for the worry. Your payment went through. The order was saved under a slightly different email address than the one you paid with, so the credits and the confirmation went there. Could you confirm this is your address? As soon as you do, I will move the credits to your account."
+        return "Thank you for writing, and sorry for the worry. Your payment went through. The order was saved under a slightly different email address than the one you paid with, so the credits and the confirmation went there instead. Could you confirm that the address you paid with is yours? As soon as you do, I will move the credits there."
     if v.broken == "mail_delivered":
         return "Thank you for your patience. Your credits are already in your account — our confirmation email failed to send, so you were never told. Please log in and check your balance; I will resend the confirmation as well."
     return "Thank you for writing. I checked every step of your order and everything went through; your credits are in your account."

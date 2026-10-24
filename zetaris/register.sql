@@ -2,10 +2,10 @@
 -- Registers three datasources (shop app DB, payment-provider ledger, mail-provider events) and builds the `order_journey` unified semantic layer over their five tables.
 -- Syntax per https://zetaris.github.io/getting-started/docs/guides/zetaris-lightning-sql-commands.html
 --
--- Source layout for the local Docker platform: the synthetic CSVs are loaded into a `demo`
--- database on the bundled Postgres (zetaris/load_postgres.sh). Zetaris reads them in place
--- over JDBC; nothing is copied into Zetaris. In production each source is its own system
--- (PSP ledger REST, app database, log exports on S3, mail-provider REST) — same SQL for the agent.
+-- Source layout for the local Docker platform: the synthetic CSVs are loaded into three databases on the
+-- bundled Postgres (zetaris/load_postgres.sh): `demo` (shop app DB: orders, grants, server_logs), `psp`
+-- (payment-provider ledger: payments) and `mailprov` (mail-provider events: mail_events). Zetaris reads them
+-- in place over JDBC as three datasources; nothing is copied into Zetaris.
 
 -- 1. datasource (administrator)
 CREATE DATASOURCE demo_pg DESCRIBE BY "synthetic_seller_sources" OPTIONS (
@@ -94,9 +94,13 @@ ACTIVATE USL TABLE lightning.metastore.demo.order_journey.grants AS SELECT COALE
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.server_logs AS SELECT COALESCE(ts,'') AS ts, route, order_id, http_status, message FROM demo_pg.server_logs;
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.mail_events AS SELECT COALESCE(email_id,'') AS email_id, to_address, event, ts, order_tag FROM mail_pg.mail_events;
 
--- 4. smoke test — the one query the agent sends for an order's journey (three datasources, one join). The agent sets ZETARIS_SCHEMA=lightning.metastore.demo.order_journey
-SELECT o.order_id, o.status, p.status AS psp_status, g.grant_id
+-- 4. smoke test: the journey join the agent sends (agent/tools.py order_journey, which selects every column with
+--    aliases; the agent sets ZETARIS_SCHEMA=lightning.metastore.demo.order_journey). Five tables, three datasources.
+SELECT o.order_id, o.email AS order_email, p.customer_email AS payer, p.status AS psp_status,
+       g.grant_id, l.route, l.http_status, m.event AS mail_event
 FROM lightning.metastore.demo.order_journey.orders o
 LEFT JOIN lightning.metastore.demo.order_journey.payments p ON p.payment_id = o.payment_id
 LEFT JOIN lightning.metastore.demo.order_journey.grants g ON g.order_id = o.order_id
-WHERE o.order_id IN ('ord_0901','ord_0902','ord_0903','ord_0904','ord_0905');
+LEFT JOIN lightning.metastore.demo.order_journey.server_logs l ON l.order_id = o.order_id
+LEFT JOIN lightning.metastore.demo.order_journey.mail_events m ON m.order_tag = o.order_id
+WHERE o.order_id = 'ord_0906';

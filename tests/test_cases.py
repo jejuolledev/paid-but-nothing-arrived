@@ -206,9 +206,20 @@ def test_reply_with_masked_placeholders_is_replaced():
 
 def test_claim_check_catches_a_cited_but_false_sentence():
     from agent.investigator import _claims_ok
-    rows = {"payments:pay_0906": {"payment_id": "pay_0906", "amount": "24900", "customer_email": "liam.patel906@example.com"},
+    rows = {"payments:pay_0906": {"payment_id": "pay_0906", "amount": "24900", "status": "PAID", "customer_email": "liam.patel906@example.com"},
             "orders:ord_0906": {"order_id": "ord_0906", "email": "liam.patel906@exmaple.com"}}
     ok, _ = _claims_ok("The customer paid 24,900 KRW [payments:pay_0906]. The order used l***@exmaple.com [orders:ord_0906].", rows)
     assert ok
     ok, rep = _claims_ok("The customer paid 49,900 KRW [payments:pay_0906].", rows)
     assert not ok and rep[0]["unsupported"] == ["49900"]
+
+
+def test_claim_check_catches_wrong_states():
+    from agent.investigator import _claims_ok
+    rows = {"payments:pay_0906": {"payment_id": "pay_0906", "amount": "24900", "status": "PAID"},
+            "grants:g_ord_0906": {"grant_id": "g_ord_0906", "credits": "30", "status": "granted"},
+            "mail_events:m_ord_0906@bounced": {"email_id": "m_ord_0906", "event": "bounced"}}
+    assert not _claims_ok("The payment failed at the provider and was never charged [payments:pay_0906].", rows)[0]
+    assert not _claims_ok("Credits were granted twice [grants:g_ord_0906].", rows)[0]
+    assert _claims_ok("The payment went through [payments:pay_0906] and the mail bounced [mail_events:m_ord_0906@bounced].", rows)[0]
+    assert not _claims_ok("The mail bounced [payments:pay_0906].", rows)[0]

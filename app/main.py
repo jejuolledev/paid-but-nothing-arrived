@@ -59,6 +59,18 @@ def api_approve(body: ApproveBody):
         return PlainTextResponse(str(e), status_code=400)
 
 
+@app.get("/api/audit")
+def api_audit():
+    """Every approved fix, newest first (offline demo; on Zetaris fixes go to the seller's own systems)."""
+    from agent.sql_backend import get_backend
+    db = get_backend()
+    if "duckdb" not in db.name:
+        return JSONResponse({"backend": db.name, "actions": [], "note": "read-only backend: no fixes are applied here"})
+    with db.lock:
+        rows = db.query("SELECT * FROM actions ORDER BY ts DESC")
+    return JSONResponse({"backend": db.name, "actions": rows})
+
+
 @app.post("/api/reset")
 def api_reset():
     """Offline demo only: reload the synthetic data so an approved fix can be shown again."""
@@ -75,7 +87,12 @@ def evidence(ask: Ask):
     r = investigate(ask.message, ask.email, ask.order_id)
     if not r.get("ok"):
         return PlainTextResponse(r["headline"])
-    lines = [f"# Evidence bundle — order {r['order_id']} ({r['email']})", "", f"**Finding:** {r['headline']}", "", f"**Root cause:** {r['explanation']}", "", "## Money chain"]
+    lines = [f"# Evidence bundle — order {r['order_id']} ({r['email']})", ""]
+    if r.get("sender_unverified"):
+        lines += ["> Note: the message had no sender address; check that this order's email is the person who wrote.", ""]
+    if r.get("ignored_order"):
+        lines += [f"> Note: {r['ignored_order']} was quoted in the message but belongs to another customer, so it was not read.", ""]
+    lines += [f"**Finding:** {r['headline']}", "", f"**Root cause:** {r['explanation']}", "", "## Money chain"]
     for l in r["chain"]:
         lines.append(f"- [{l['state'].upper()}] {l['label']} — {l['note']}" + (f"  (refs: {', '.join(l['refs'])})" if l["refs"] else ""))
     jq = [q for q in r.get("queries", []) if q["tool"] == "order_journey"]

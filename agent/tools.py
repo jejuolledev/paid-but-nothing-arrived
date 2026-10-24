@@ -1,4 +1,4 @@
-"""The three SQL tools the agent is allowed to call. Every row returned carries a
+"""The read-only SQL tools the agent is allowed to call. Every row returned carries a
 `ref` (source table + primary key) so any conclusion can cite the exact row."""
 from __future__ import annotations
 import re
@@ -66,8 +66,7 @@ class Tools:
         oid = lit("order_id", order_id)
         cols = ", ".join(f"{a}.{c} AS {a}__{c}" for a, t in _ALIAS.items() for c in COLS[t])
         sql = (f"SELECT {cols} FROM orders o "
-               "LEFT JOIN payments p ON (p.payment_id = o.payment_id) "
-               "OR ((o.payment_id IS NULL OR o.payment_id = '') AND lower(p.customer_email) = lower(o.email)) "
+               "LEFT JOIN payments p ON p.payment_id = o.payment_id "
                "LEFT JOIN grants g ON g.order_id = o.order_id "
                "LEFT JOIN server_logs l ON l.order_id = o.order_id "
                "LEFT JOIN mail_events m ON m.order_tag = o.order_id "

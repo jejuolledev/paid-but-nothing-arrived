@@ -27,6 +27,7 @@ for c in cases:
     named = next((t["detail"] for t in r.get("trace", []) if t["step"] == "agent_loop"), "")
     rows.append(dict(case=c["case"], verdict_ok=r.get("broken") == c["broken_link"] and r.get("order_id") == c["order_id"], llm=r.get("llm"), agent_steps=len(r.get("steps", [])),
                      loop_named=f"named {c['order_id']}" in named, reply_kept=not r["citation_check"].get("reply_replaced"),
+                     backend=r.get("backend", ""),
                      citations=r["citation_check"], ms=r["elapsed_ms"], reply_len=len(r["customer_reply"])))
     print("   explanation:", r["explanation"][:300].replace("\n", " "))
     print("   reply:", r["customer_reply"][:200].replace("\n", " "))
@@ -37,7 +38,7 @@ probe_ok = probe.get("order_id") != "ord_0903"
 print("probe:", probe.get("order_id"), probe.get("ignored_order"))
 ok = sum(x["verdict_ok"] for x in rows); cit = sum(1 for x in rows if x["citations"].get("ok"))
 loop = sum(x["loop_named"] for x in rows); kept = sum(x["reply_kept"] for x in rows)
-line = (f"| {time.strftime('%Y-%m-%d %H:%M')} | {rows[0]['llm']} | verdict {ok}/{len(rows)}; agent loop named the order {loop}/{len(rows)}; "
+line = (f"| {time.strftime('%Y-%m-%d %H:%M')} | {rows[0]['llm']} (data: {rows[0]['backend']}) | verdict {ok}/{len(rows)}; agent loop named the order {loop}/{len(rows)}; "
         f"model reply kept {kept}/{len(rows)}; cross-customer probe {'blocked' if probe_ok else 'LEAKED'} | citations passed {cit}/{len(rows)} | avg {sum(x['ms'] for x in rows)//len(rows)} ms |")
 md = ROOT / "docs/measurements.md"
 if not md.exists():

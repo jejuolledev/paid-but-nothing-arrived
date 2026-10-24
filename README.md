@@ -49,7 +49,7 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
 - `agent/agent_loop.py` — the investigation loop: Nemotron picks the next tool; the tools only follow the sender's own trail.
 - `agent/actions.py` — human-approved fixes with an audit log (offline demo; Zetaris stays read-only).
 - `agent/chain.py` — the verifier. Green / red / grey per link, each with the refs that decided it. The model never overrides it.
-- `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check and the per-sentence claim check (every amount and address a sentence states must be in the rows it cites).
+- `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check and the per-sentence claim check (every amount (3+ digits), address domain and payment / mail / grant state a sentence states must match the rows it cites).
 - `app/` — FastAPI + a single page: the chain, "why" with clickable citations, verified / not verified, reply draft, fix (needs approval), dispute evidence bundle.
 
 ## Requirements

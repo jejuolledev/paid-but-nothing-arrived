@@ -153,6 +153,7 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
             seen_orders.update(r["order_id"] for r in rows if r.get("order_id"))
             shown = {k: al.rows(v) for k, v in result.items()} if isinstance(result, dict) else al.rows(result)
             obs = json.dumps(shown, default=str)[:6000]
+            obs = EMAIL_RE.sub(lambda m: al.email(m.group(0)), obs)  # also addresses inside free text (e.g. a log message)
             steps.append({"thought": act.get("thought", ""), "tool": name, "args": args, "rows": len(rows), "ms": int((time.time() - t0) * 1000), "receipt": receipt,
                           "sql": [q["sql"] for q in tools.sql_log[n0:]]})
         except (KeyError, ValueError, PermissionError) as e:

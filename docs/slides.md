@@ -49,7 +49,7 @@ Green until the link that broke. Click the link → the raw row that proves it. 
 2. `order_journey` — one read-only SQL statement to Zetaris, joining five tables across three datasources
 3. deterministic verifier: each link green / red / grey, with refs
 4. Nemotron (via Nightshift) explains and drafts the reply; the fix comes from the verifier
-5. citation + claim check: the explanation may cite only returned `ref`s, and every amount and address in each sentence must be in the rows it cites — or it is replaced by the verifier's text
+5. citation + claim check: the explanation may cite only returned `ref`s, and every amount, address domain and payment / mail / grant state in each sentence must match the rows it cites — or it is replaced by the verifier's text
 
 ---
 
@@ -103,5 +103,5 @@ Case 5: grey chain, "You were never charged." The message also quoted another cu
 
 - Real PSP connectors (Stripe, PortOne) and mail providers as Zetaris REST sources
 - Screenshot reading (receipt / card SMS) with a local vision model
-- Installable edition for sellers; Korean UI
+- Installable edition for sellers; full Korean text for chain notes and fixes
 - Cursor: project rules in .cursor/rules

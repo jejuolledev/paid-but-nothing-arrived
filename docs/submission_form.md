@@ -35,7 +35,5 @@ https://github.com/jejuolledev/paid-but-nothing-arrived
 https://github.com/jejuolledev/paid-but-nothing-arrived/blob/main/docs/slides.pdf
 ```
 
-## Before submitting
-1. Make the repository public: `gh repo edit jejuolledev/paid-but-nothing-arrived --visibility public --accept-visibility-change-consequences`
-2. Upload `docs/demo/final_v2.mp4` to YouTube (public or unlisted), put the link in README.md "Demo video", commit, push.
-3. Paste the values above. Pre-existing components: none of our product code; open-source libraries only (see README).
+## Notes
+Pre-existing components: none of our product code; open-source libraries only (see README).
