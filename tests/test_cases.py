@@ -223,3 +223,27 @@ def test_claim_check_catches_wrong_states():
     assert not _claims_ok("Credits were granted twice [grants:g_ord_0906].", rows)[0]
     assert _claims_ok("The payment went through [payments:pay_0906] and the mail bounced [mail_events:m_ord_0906@bounced].", rows)[0]
     assert not _claims_ok("The mail bounced [payments:pay_0906].", rows)[0]
+
+
+def test_card_digits_never_reach_the_model(monkeypatch):
+    """Run the real payload path with a fake model that records everything it is sent."""
+    sent = []
+
+    class Fake:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kw):
+                    sent.append(json.dumps(kw["messages"], ensure_ascii=False))
+                    raise RuntimeError("offline")
+    monkeypatch.setattr("agent.investigator._client", lambda: (Fake, "fake-model"))
+    r = investigate("I paid but my credits never came. Order ord_0901. hana.lee901@example.com")
+    assert r["ok"] and sent
+    blob = " ".join(sent)
+    assert "4242" not in blob and "hana.lee901@example.com" not in blob
+
+
+def test_claim_check_eval_catches_all_wrong_sentences():
+    out = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve().parent.parent / "scripts/claim_eval.py")],
+                         capture_output=True, text=True, check=True).stdout
+    assert "wrong sentences caught 30/30" in out and "wrongly rejected 0/12" in out

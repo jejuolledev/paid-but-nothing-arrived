@@ -83,7 +83,9 @@ def _mask(text: str, customer_email: str) -> str:
     """Last pass over everything sent to the model: no full address survives, wherever it appears."""
     from .agent_loop import Aliaser, EMAIL_RE
     al = Aliaser(customer_email)
-    text = re.sub(r"•••• ?\d{4}", "•••• ****", text)  # card digits never reach the model
+    # card digits never reach the model — in plain text and in JSON-escaped text (\u2022\u2022\u2022\u2022 4242)
+    text = re.sub(r"(?:•|\\u2022){4} ?\d{4}", "•••• ****", text)
+    text = re.sub(r"(card(?:\s+ending(?:\s+in)?)?[^\d]{0,12})\d{4}\b", r"\1****", text, flags=re.I)
     return EMAIL_RE.sub(lambda m: al.email(m.group(0)), text)
 
 
@@ -98,26 +100,43 @@ def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
 _FACT_NUM = re.compile(r"\b\d[\d,]{2,}\b")            # amounts, codes, years: 3+ digits
 _FACT_DOMAIN = re.compile(r"@([\w-]+(?:\.[\w-]+)+)")    # the domain of an address (masked or not)
 # state words a sentence may claim, and what the cited rows must show for each
+_PAID = lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith("payments:"))
+_GRANTED = lambda rows: any(r.get("ref", "").startswith("grants:") and str(r.get("status", "")).lower() == "granted" for r in rows) \
+    or any(r.get("ref", "").startswith("orders:") and str(r.get("credited", "")) == "1" for r in rows)
+_EVENTS = lambda rows: {str(r.get("event", "")).lower() for r in rows if r.get("ref", "").startswith("mail_events:")}
+# state words a sentence may claim (English and Korean), and what the cited rows must show for each. Negated forms come
+# first; a sentence that states a negated form is not also read as claiming the positive one.
 _STATES = [
-    # a payment that did not happen: only when the sentence says so about the payment / charge / card
-    (r"\b(?:payment|charge|card)\b[^.;]{0,30}\b(?:failed|declined)\b|\b(?:never charged|no charge|not charged|wasn't charged|never paid|not paid)\b",
-     lambda rows: not any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith("payments:"))),
-    (r"\b(paid|charged|went through)\b",
-     lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith(("payments:", "orders:")))
+    ("pay-", r"\b(?:payment|charge|card)\b[^.;]{0,30}\b(?:failed|declined|not completed|did not go through)\b|\b(?:never charged|no charge|not charged|wasn't charged|never paid|not paid)\b|결제[가는]?\s*(?:실패|취소|되지 않)|청구되지",
+     # true when nothing cited is PAID, or a cited log records the failed / declined attempt itself
+     lambda rows: not _PAID(rows) or any(re.search(r"fail|declin", str(r.get("message", "")), re.I) for r in rows)),
+    ("pay+", r"\b(?:paid|charged|went through)\b|결제[가는]?\s*(?:완료|정상|됐|되었)",
+     lambda rows: _PAID(rows) or any(str(r.get("status", "")).lower() == "paid" for r in rows if r.get("ref", "").startswith("orders:"))
                   or any("paid" in str(r.get("message", "")).lower() for r in rows)),
-    # anything else that "failed" / errored: some cited row must show a failure (a value, an HTTP 4xx/5xx, a bounce)
-    (r"\b(?:failed|failure|error)\b",
+    ("grant-", r"\b(?:never granted|not granted|no credits (?:were )?granted|credits (?:never|did not) (?:arrive|come))\b|지급되지\s*않|지급 안",
+     lambda rows: not _GRANTED(rows)),
+    ("grant+", r"\b(?:granted|credited)\b|지급(?:됐|되었|했)",
+     lambda rows: _GRANTED(rows)),
+    ("mail-", r"\b(?:never delivered|not delivered|never sent|not sent|never received)\b|발송되지\s*않|받지 못",
+     lambda rows: not ({"delivered"} & _EVENTS(rows)) and (not _EVENTS(rows) or "bounced" in _EVENTS(rows) or not ({"sent"} & _EVENTS(rows)))),
+    ("mail+", r"\bdelivered\b",
+     lambda rows: bool({"delivered", "sent"} & _EVENTS(rows)) and "bounced" not in _EVENTS(rows)),
+    ("fail", r"\b(?:failed|failure|error)\b|실패|오류",
      lambda rows: any("fail" in " ".join(str(v).lower() for v in r.values()) or "error" in str(r.get("message", "")).lower()
                       or str(r.get("http_status", "0"))[:1] in ("4", "5") or str(r.get("event", "")).lower() == "bounced" for r in rows)),
-    (r"\bbounced?\b", lambda rows: any(str(r.get("event", "")).lower() == "bounced" for r in rows)),
-    (r"\b(twice|duplicate|double)\b", lambda rows: sum(1 for r in rows if r.get("ref", "").startswith("grants:")) >= 2),
-    (r"\brefund(ed)?\b", lambda rows: False),  # nothing in the data is a refund
+    ("bounce", r"\bbounced?\b|반송", lambda rows: "bounced" in _EVENTS(rows)),
+    ("twice", r"\b(?:twice|duplicate|double|two grants)\b|두 번|중복", lambda rows: sum(1 for r in rows if r.get("ref", "").startswith("grants:")) >= 2),
+    ("refund", r"\brefund(?:ed)?\b|환불(?:됐|되었|했)", lambda rows: False),  # nothing in the data is a refund
 ]
+_NEG_OF = {"pay+": "pay-", "grant+": "grant-", "mail+": "mail-"}
+_IDS = re.compile(r"\b(?:ord_\d{4}|pay_[\w-]+|g_ord_[\w-]+|m_ord_[\w-]+)\b")
+_CREDITS = re.compile(r"\b(\d+)\s*(?:credits?|이용권)")
 
 
 def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
-    """Sentence by sentence: every number (3+ digits) and every e-mail domain a sentence states must appear in
-    a row that the same sentence cites (or, if it cites nothing, in a row cited elsewhere in the explanation).
+    """Sentence by sentence, against the rows the same sentence cites (or, if it cites nothing, the rows cited
+    elsewhere in the explanation): every 3+-digit number, email domain, record id (ord_/pay_/g_ord_/m_ord_) and
+    "N credits" must appear there, and every payment / credit / mail state it claims (EN or KO) must match.
     Catches an explanation that cites a real row but says something the row does not show."""
     cited_all = [c.rstrip(".,;)") for c in REF_RE.findall(text)]
     report, ok = [], True
@@ -129,11 +148,21 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
         missing = [f for f in facts if f.lower() not in hay]
         rows = [dict(ref_rows[r], ref=r) for r in refs if r in ref_rows]
         low = body.lower()
-        negated = re.search(_STATES[0][0], low)
-        for pat, holds in _STATES:
-            m = re.search(pat, low)
-            if not m or (pat is _STATES[1][0] and negated):  # "never charged" is not a claim of "charged"
+        # ids named in the sentence (orders, payments, grants, mails) must be in the rows it cites
+        for i in _IDS.findall(body):
+            facts.append(i)
+            if i.lower() not in hay:
+                missing.append(i)
+        # "N credits" at any digit count must match a cited grant
+        for n in _CREDITS.findall(body):
+            facts.append(f"{n} credits")
+            if not any(str(r.get("credits", "")) == n for r in rows):
+                missing.append(f"{n} credits")
+        hit = {name for name, pat, _ in _STATES if re.search(pat, low)}
+        for name, pat, holds in _STATES:
+            if name not in hit or _NEG_OF.get(name) in hit:  # "never charged" is not also a claim of "charged"
                 continue
+            m = re.search(pat, low)
             facts.append(m.group(0))
             if not holds(rows):
                 missing.append(m.group(0))
@@ -211,7 +240,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
         mark("find_orders", f"{len(orders)} order(s) for {order_id or email}")
         if not orders and email:
             pays = tools.find_payments(email)
-            mark("find_payments", f"{len(pays)} PSP payment(s) by this address")
+            mark("find_payments", f"{len(pays)} payment-provider payment(s) by this address")
             for p in pays:
                 orders += tools.order_for_payment(p["payment_id"])
             mark("order_for_payment", f"{len(orders)} order(s) behind those payments")
@@ -222,7 +251,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
         target = next((o for o in orders if not (o["status"] == "paid" and o["credited"] == "1")), orders[0])
 
     # 2. journey + 3. deterministic verification (the part that is never delegated to a model)
-    journey = tools.order_journey(target["order_id"]); mark("order_journey", f"one query; {sum(len(v) for v in journey.values())} rows split back into {sum(1 for v in journey.values() if v)} of the 5 tables")
+    journey = tools.order_journey(target["order_id"]); mark("order_journey", f"one query; {tools.sql_log[-1]['rows'] if tools.sql_log else '?'} joined rows → {sum(len(v) for v in journey.values())} rows across {sum(1 for v in journey.values() if v)} tables")
     verdict = verify(journey); mark("verify_chain", f"broken={verdict.broken}")
     refs = {r["ref"] for rows in journey.values() for r in rows}
 
@@ -232,7 +261,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
     if client:
         try:
             lang_note = " Reply language: Korean (polite 존댓말)." if lang == "ko" else ""
-            user_payload = _mask(json.dumps({"customer_message": message[:2000], "chain": verdict.to_dict(),
+            user_payload = _mask(json.dumps(ensure_ascii=False, obj={"customer_message": message[:2000], "chain": verdict.to_dict(),
                                              "rows": _redact(journey, email), "investigation": loop_finding}, default=str), email)
             from .agent_loop import _parse
             for attempt in (1, 2):  # the hosted endpoint sometimes times out or returns no JSON; one retry

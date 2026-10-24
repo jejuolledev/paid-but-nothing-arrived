@@ -77,7 +77,7 @@ const slug=ref=>String(ref??'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace
 
 const CHAIN_LABEL_KO={
   'Card authorized':'카드 승인',
-  'PSP ledger PAID':'PSP 원장 PAID',
+  'Payment provider: paid':'결제대행사: 결제 완료',
   'Order confirmed':'주문 확정',
   'Credits granted':'크레딧 지급',
   'Mail delivered':'메일 발송',
@@ -103,7 +103,7 @@ const TOOL_KO={
 const I18N={
   en:{
     title:'Paid, but nothing arrived.',
-    subtitle:"When a customer says 'I paid but nothing arrived', it checks the payment provider, orders, credits and mail in one pass, shows where the chain broke, and drafts your reply.",
+    subtitle:"When a customer says 'I paid but nothing arrived', this agent checks the payment provider, orders, credits and mail in one pass, shows where the chain broke, and drafts your reply.",
     sponsors:'Zetaris · Meterless Nightshift · NVIDIA Nemotron',
     placeholder:'Paste the customer\'s message, e.g. “Hi, I paid for the Standard pack but nothing showed up. Order ord_0901.”',
     go:'Investigate',
@@ -127,7 +127,7 @@ const I18N={
     unverified:'Not verified',
     evidence:'Evidence: raw rows',
     trace:'Trace',
-    citationOk:'Citation check: passed — every cited row was returned by the query, and every amount, address domain and payment / mail / grant state in each sentence matched the rows it cites',
+    citationOk:'Citation check: passed. Every cited row came from the query, and every amount, record id, email domain and status in each sentence matches the rows it cites.',
     checkedFacts:f=>'found in the cited rows: '+f.join(', '),
     citationFail:'Citation check: failed → verifier text used',
     citationSkip:'Citation check: model step skipped (no model reachable)',
@@ -137,14 +137,14 @@ const I18N={
     allSql:src=>`Every statement sent through the SQL door (${src}), in order:`,
     refused:'refused (not this sender\'s record)',
     oneQuery:(src,n)=>`Every row below came from this one query — ${src} — ${n} joined row(s), split back into the five tables (three datasources):`,
-    knownPattern:'This root cause is the known pattern for this kind of break (from our incident notes); the cited rows show the symptoms.',
+    knownPattern:'The cause shown is the usual one for this kind of break (from our incident notes); the cited rows show the symptoms.',
     resetDone:'Demo data reset. Click a case to start again.',
     evidenceBtn:'Dispute evidence bundle',
     ms:'ms',
     answeredBy:m=>'Answered by: '+m,
     templateExplain:'Explanation: template (no model connected)',
     failedExplain:'Explanation: verifier text (model call failed twice)',
-    unreachableExplain:'Explanation: verifier text (no model reachable — start Nightshift, or leave NIGHTSHIFT_BASE_URL empty)',
+    unreachableExplain:'Explanation: verifier text (no model reachable. Start Nightshift, or unset NIGHTSHIFT_BASE_URL to use the templates on purpose)',
     recheckExplain:'Re-checked by the verifier after your fix',
     dataZetaris:'Data: Zetaris',
     dataLocal:'Data: local files',
@@ -155,7 +155,7 @@ const I18N={
     howTitle:'How it works',
     how1:'Paste the customer message',
     how1d:'their email is enough',
-    how2:'One SQL door reads your records',
+    how2:'One SQL door (Zetaris) reads your records',
     how2d:'payments, orders, credits, logs, mail — read-only, via Zetaris',
     how3:'The agent investigates',
     how3d:'Nemotron via Meterless Nightshift picks what to check; emails masked',
@@ -197,7 +197,7 @@ const I18N={
     unverified:'확인되지 않음',
     evidence:'근거: 원본 행',
     trace:'추적',
-    citationOk:'인용 검사: 통과 — 인용한 행은 모두 쿼리가 돌려준 행이고, 문장마다 적힌 금액·주소 도메인·결제/메일/지급 상태가 그 문장이 인용한 행과 일치함',
+    citationOk:'인용 검사: 통과 — 인용한 행은 모두 쿼리가 돌려준 행이고, 문장마다 적힌 금액·기록 번호·메일 도메인·상태가 그 문장이 인용한 행과 일치합니다.',
     checkedFacts:f=>'인용한 행에서 확인: '+f.join(', '),
     citationFail:'인용 검사: 실패 → 검증기 문구 사용',
     citationSkip:'인용 검사: 모델 단계 생략(연결된 모델 없음)',
@@ -225,7 +225,7 @@ const I18N={
     howTitle:'작동 방식',
     how1:'고객 메시지를 붙여 넣기',
     how1d:'이메일만 있어도 됩니다',
-    how2:'SQL 한 문으로 기록을 읽습니다',
+    how2:'SQL 창구 하나(Zetaris)로 기록을 읽습니다',
     how2d:'결제·주문·크레딧·로그·메일 — 읽기 전용, Zetaris 경유',
     how3:'에이전트가 조사합니다',
     how3d:'Meterless Nightshift의 Nemotron이 확인할 항목을 고릅니다. 이메일은 가려집니다',
@@ -555,6 +555,11 @@ async function approveFix(orderId, customerConfirmed){
   if(btn)btn.disabled=true;
   $('#status').textContent=i.approving;
   const beforeChain=lastResult&&lastResult.chain?lastResult.chain.slice():[];
+  // moving credits to another address needs the customer's confirmation: ask first instead of waiting for the server's 409
+  if(!customerConfirmed&&lastResult&&lastResult.broken==='account_mismatch'){
+    if(!confirm(i.confirmAddress)){if(btn)btn.disabled=false;$('#status').textContent='';return;}
+    customerConfirmed=true;
+  }
   try{
     const payload={order_id:orderId,approved_by:'seller'};
     if(customerConfirmed)payload.customer_confirmed=true;

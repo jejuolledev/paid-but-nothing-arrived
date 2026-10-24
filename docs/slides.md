@@ -23,13 +23,13 @@ Track 02 — The Agent That Can Explain Why · Team MoaHub (solo)
 
 - Who: a one-person or small online seller of digital goods, credits, subscriptions. No support team.
 - The message: **"I paid, but nothing arrived."**
-- Slow answer → card dispute, *product not received*. The customer holds the proof (card SMS). The seller has to find theirs.
+- Slow answer → card dispute, *product not received*. The customer holds the proof (their bank's payment text). The seller has to find theirs.
 
 ---
 
 # Today: four screens, by hand
 
-PSP dashboard · orders database · server logs · mail provider
+Payment-provider dashboard · orders database · server logs · mail provider
 
 Same question asked four times, lined up by eye. We did this ourselves while auditing our own checkout.
 
@@ -37,9 +37,9 @@ Same question asked four times, lined up by eye. We did this ourselves while aud
 
 # The solution: one chain, one broken link
 
-`card authorized → PSP paid → order confirmed → credits granted → mail delivered`
+`card authorized → payment provider paid → order confirmed → credits granted → mail delivered`
 
-Green until the link that broke. Click the link → the raw row that proves it. Then: reply draft · fix (needs approval) · dispute evidence bundle.
+Every link is green up to the one that broke. Click the link → the raw row that proves it. Then: reply draft · fix (needs approval) · dispute evidence bundle.
 
 ---
 
@@ -49,13 +49,13 @@ Green until the link that broke. Click the link → the raw row that proves it. 
 2. `order_journey` — one read-only SQL statement to Zetaris, joining five tables across three datasources
 3. deterministic verifier: each link green / red / grey, with refs
 4. Nemotron (via Nightshift) explains and drafts the reply; the fix comes from the verifier
-5. citation + claim check: the explanation may cite only returned `ref`s, and every amount, address domain and payment / mail / grant state in each sentence must match the rows it cites — or it is replaced by the verifier's text
+5. citation + claim check: the explanation may cite only returned `ref`s, and every amount, record id, email domain and payment, credit or mail status in each sentence must match the rows it cites (30/30 wrong sentences caught in `scripts/claim_eval.py`) — or it is replaced by the verifier's text
 
 ---
 
 # Technical stack
 
-Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift · NVIDIA Nemotron 3.5 Lightning · DuckDB (tests) · Cursor
+Python 3.12 · FastAPI · Zetaris (JDBC driver, unified semantic layer) · Meterless Nightshift · NVIDIA Nemotron 3.5 Lightning · DuckDB (tests) · built with Cursor (project rules in `.cursor/rules`)
 
 ---
 
@@ -79,7 +79,7 @@ The agent's journey query in Zetaris's SQL Workspace: three datasources, one sta
 
 - Every model call goes through Nightshift on the Mac: a Nemotron lane (NVIDIA's hosted endpoint in the demo), a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured on Zetaris (three datasources) through Nightshift → Nemotron (hosted): right order and link 6/6, loop found the order 6/6, citation + claim check 6/6, cross-customer probe blocked; 20 automated tests.
+- Measured on Zetaris (three datasources) through Nightshift → Nemotron (hosted): right order and link 6/6, loop named the order 6/6 (case 6 from the payer's email alone), citation + claim check 6/6, cross-customer probe blocked; 22 automated tests.
 
 ---
 
@@ -101,7 +101,6 @@ Case 5: grey chain, "You were never charged." The message also quoted another cu
 
 # What's next
 
-- Real PSP connectors (Stripe, PortOne) and mail providers as Zetaris REST sources
+- Real payment-provider connectors (Stripe, PortOne) and mail providers as Zetaris REST sources
 - Screenshot reading (receipt / card SMS) with a local vision model
 - Installable edition for sellers; full Korean text for chain notes and fixes
-- Cursor: project rules in .cursor/rules

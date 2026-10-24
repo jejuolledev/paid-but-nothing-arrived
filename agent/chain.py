@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 
 LINKS = ["card_authorized", "psp_paid", "order_created", "credit_granted", "mail_delivered"]
-LABELS = {"card_authorized": "Card authorized", "psp_paid": "PSP ledger PAID", "order_created": "Order confirmed",
+LABELS = {"card_authorized": "Card authorized", "psp_paid": "Payment provider: paid", "order_created": "Order confirmed",
           "credit_granted": "Credits granted", "mail_delivered": "Mail delivered"}
 
 
@@ -51,14 +51,14 @@ def verify(journey: dict) -> Verdict:
 
     # 1 card authorized / 2 PSP paid — one source: the PSP ledger
     if paid:
-        links.append(Link("card_authorized", "green", f"PSP ledger shows a PAID charge of {paid[-1]['amount']} {paid[-1]['currency']} (card •••• {paid[-1]['card_last4']})", [paid[-1]["ref"]]))
-        links.append(Link("psp_paid", "green", "PSP status PAID", [paid[-1]["ref"]]))
-        verified.append(f"Charge exists at the PSP ({paid[-1]['ref']})")
+        links.append(Link("card_authorized", "green", f"Payment provider shows a PAID charge of {paid[-1]['amount']} {paid[-1]['currency']} (card •••• {paid[-1]['card_last4']})", [paid[-1]["ref"]]))
+        links.append(Link("psp_paid", "green", "Payment provider status: PAID", [paid[-1]["ref"]]))
+        verified.append(f"Charge exists at the payment provider ({paid[-1]['ref']})")
     else:
         only_start = all(l["route"].endswith("/checkout/start") for l in logs) if logs else True
-        links.append(Link("card_authorized", "grey", "No charge at the PSP for this order", []))
+        links.append(Link("card_authorized", "grey", "No charge at the payment provider for this order", []))
         links += [Link(n, "grey", "not reached", []) for n in LINKS[1:]]
-        verified.append("No payment row at the PSP for this order or email")
+        verified.append("No payment row at the payment provider for this order or email")
         unverified.append("Customer's card statement (not provided) — could confirm nothing was charged on their side")
         return Verdict(oid, links, None, "Nothing is broken. You were never charged.", verified, unverified,
                        "The checkout was started but never reached the card step" + (" (only /checkout/start in the logs)." if only_start else "."),
@@ -71,12 +71,12 @@ def verify(journey: dict) -> Verdict:
     else:
         refs = [o["ref"]] + [w["ref"] for w in webhook_paid[:1]] + [c["ref"] for c in confirms[:1]]
         if confirms and confirms[-1]["http_status"] == "409":
-            note = f"Webhook PAID arrived, but /confirm returned 409 because the order row already said '{o['status']}' and the PSP was not re-checked"
-            cause = "A first attempt failed, the retry succeeded at the PSP, and our confirm step trusted the stale 'failed' status instead of re-checking the PSP. The reconcile job only scans pending orders, so nothing ever repaired it."
-            fix = "Re-check the PSP for this payment id and mark the order paid, then grant credits (requires approval). Code fix: confirm must re-query the PSP when the local status is failed; reconcile must include failed orders with a PAID webhook."
+            note = f"Webhook PAID arrived, but /confirm returned 409 because the order row already said '{o['status']}' and the payment provider was not re-checked"
+            cause = "A first attempt failed, the retry succeeded at the payment provider, and our confirm step trusted the stale 'failed' status instead of re-checking the payment provider. The reconcile job only scans pending orders, so nothing ever repaired it."
+            fix = "Re-check the payment provider for this payment id and mark the order paid, then grant credits (requires approval). Code fix: confirm must re-query the payment provider when the local status is failed; reconcile must include failed orders with a PAID webhook."
         elif not confirms:
             note = f"Webhook PAID arrived, but no /confirm request was ever received; order stayed '{o['status']}'"
-            cause = "The customer paid, the PSP told us, but the client-side confirm call never happened — consistent with the confirm button being unreachable after payment."
+            cause = "The customer paid, the payment provider told us, but the client-side confirm call never happened — consistent with the confirm button being unreachable after payment."
             fix = "Confirm the order server-side from the PAID webhook and grant credits (requires approval). Code fix: never rely on a client click after a PAID webhook."
         else:
             note, cause, fix = f"Order status is '{o['status']}' despite a PAID charge", "Unknown — inspect the cited rows.", "Manual review."
@@ -93,7 +93,7 @@ def verify(journey: dict) -> Verdict:
         refs = [paid[-1]["ref"], o["ref"]] + [g["ref"] for g in grant_rows[:1]] + [m["ref"] for m in bounced[:1]]
         links.append(Link("credit_granted", "red", f"Credits went to {o['email']}, but the card was paid by {paid[-1]['customer_email']}", refs))
         links.append(Link("mail_delivered", "red" if bounced else "grey", "Mail bounced at the order address" if bounced else "Mail went to the order address", [m["ref"] for m in bounced[:1]]))
-        verified += [f"PSP payer is {paid[-1]['customer_email']} ({paid[-1]['ref']})", f"Order and grant use {o['email']} ({o['ref']})"]
+        verified += [f"Payment provider payer is {paid[-1]['customer_email']} ({paid[-1]['ref']})", f"Order and grant use {o['email']} ({o['ref']})"]
         unverified.append("Whether the order address is a typo of the payer's address or a second account (ask the customer)")
         return Verdict(oid, links, "account_mismatch", "Paid, but the credits went to a different account.", verified, unverified,
                        "The order was placed under a different address than the one that paid (looks like a typo); credits and mail went to that address.",

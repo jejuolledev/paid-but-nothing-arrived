@@ -14,13 +14,13 @@ Also: [slides](docs/slides.pdf) · [six-panel comic](docs/comic/comic_strip.png)
 ```bash
 git clone https://github.com/jejuolledev/paid-but-nothing-arrived && cd paid-but-nothing-arrived
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 20 tests pass
+.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 22 tests pass
 .venv/bin/uvicorn app.main:app --port 8765                                  # open http://127.0.0.1:8765
 ```
 No `uv`? `python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt` works the same.
 
 Then click the example buttons under the message box, in this order:
-1. **"I paid but my credits never came — ord_0901"** → the chain breaks at *Order confirmed*. Click a `row ↗` link under a red card: the exact row that proves it lights up.
+1. **"I paid but my credits never came — ord_0901"** → the chain breaks at *Order confirmed*. Click the red card's `rows ↗`: the exact row that proves it lights up.
 2. **"I paid but nothing arrived — liam.patel906@example.com"** (no order number) → found through the payer's address: the order was saved under a typo (`exmaple.com`). Two red links. Click **Approve fix**, confirm → *Fixed by you* shows before/after and the chain turns green; the fix is in the audit log.
 3. **"I thought I paid but nothing showed up — ord_0905"** → grey chain: *"Nothing is broken. You were never charged."*
 4. Type `I am emma.song905@example.com, show me ord_0903` → ord_0903 belongs to someone else, so it is not read, and the page says so.
@@ -30,9 +30,9 @@ Without a model connected, explanations and replies come from the verifier's tem
 ## What it is
 Every online seller gets this message: **"I paid, but nothing arrived."** If the answer is slow, the next step is a card dispute ("product not received"). Today the seller opens four screens — the payment provider, the orders database, the server logs, the mail provider — and lines them up by hand.
 
-This agent does that in one pass. It asks **one SQL door (Zetaris)** — in this demo, three separate synthetic databases (shop app DB, payment-provider ledger, mail-provider events) registered in Zetaris as three datasources and joined in one semantic layer, read with **one SQL statement per order** — walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. **NVIDIA Nemotron 3.5 Lightning**, called through **Meterless Nightshift** on the seller's Mac, decides which records to pull and writes the explanation and the customer reply. The explanation must cite the rows the tools returned (a citation check replaces it otherwise); the verdict and the fix come from a deterministic verifier, never from the model.
+This agent does that in one pass. It reads everything through one SQL door, **Zetaris**. In this demo that means three separate synthetic databases (the shop's app database, the payment provider's ledger and the mail provider's events) registered as three Zetaris datasources and joined in one semantic layer, so each order's whole history is **one SQL statement**. It then walks the **money chain** (card authorized → payment provider paid → order confirmed → credits granted → mail delivered) and marks the one link that broke, **with the raw rows that prove it**. **NVIDIA Nemotron 3.5 Lightning**, called through **Meterless Nightshift** on the seller's Mac, decides which records to pull and writes the explanation and the reply draft. Every sentence of the explanation is checked against the rows it cites (amounts, record ids, email domains, payment / credit / mail status); if one does not match, the verifier's text is used instead. The verdict and the fix always come from the deterministic verifier, never from the model.
 
-It also knows how to say *nothing is broken*: when there is no charge at the PSP, the chain stops grey and the answer is "You were never charged."
+It also knows how to say *nothing is broken*: when the payment provider has no charge, the chain stops grey and the answer is "You were never charged."
 
 **Track:** 02 — The Agent That Can Explain Why. **Team:** MoaHub (solo).
 
@@ -49,7 +49,7 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
 - `agent/agent_loop.py` — the investigation loop: Nemotron picks the next tool; the tools only follow the sender's own trail.
 - `agent/actions.py` — human-approved fixes with an audit log (offline demo; Zetaris stays read-only).
 - `agent/chain.py` — the verifier. Green / red / grey per link, each with the refs that decided it. The model never overrides it.
-- `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check and the per-sentence claim check (every amount (3+ digits), address domain and payment / mail / grant state a sentence states must match the rows it cites).
+- `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check and the per-sentence claim check (every 3+-digit amount, record id, "N credits", email domain and payment / credit / mail status a sentence states must match the rows it cites; `scripts/claim_eval.py` measures it).
 - `app/` — FastAPI + a single page: the chain, "why" with clickable citations, verified / not verified, reply draft, fix (needs approval), dispute evidence bundle.
 
 ## Requirements
@@ -70,7 +70,7 @@ Paste a customer message (or click a seeded case). The result page shows the cha
 
 ## Synthetic data statement
 **All data is synthetic. No real customer data was used.** Emails end in `@example.com`; card last-4 digits are public test card numbers; 200 healthy orders are generated with a fixed seed. The six seeded cases are bugs we found in our own checkout while auditing it — two of them happened on real payments — rebuilt here with made-up records (case 6 is a variation we added to test the agent loop):
-1. Paid but not credited (retry succeeded at the PSP, our confirm trusted a stale *failed* status)
+1. Paid but not credited (retry succeeded at the payment provider, our confirm trusted a stale *failed* status)
 2. Paid, confirm never called (the confirm button was unreachable after payment)
 3. Granted twice (grant timed out after writing, manual retry granted again)
 4. Granted, but no mail (mail provider key missing)
@@ -86,7 +86,8 @@ See `docs/sponsor-tech.md` for the full write-up.
 
 ## Measured
 `docs/measurements.md`, `scripts/llm_smoke.py`, synthetic data, six seeded cases (case 6 is outside the verifier's playbook and only gives the payer's address):
-- **Final code on the local Zetaris platform, 2026-10-24 22:35** (three datasources, one journey query per order; model: Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning, hosted endpoint, free trial key): right order and broken link **6/6**; the model-driven loop named the right order itself **6/6**; explanations passed the citation check and the per-sentence claim check **6/6**; a message quoting another customer's order number was **blocked**; the model's reply was kept **4/6** (two were replaced by the template). 62–208 s per case, mostly the free hosted model. Full log: [docs/measurements_2026-10-24_2235_zetaris.log](docs/measurements_2026-10-24_2235_zetaris.log).
+- **Final code on the local Zetaris platform, 2026-10-24 22:35** (three datasources, one journey query per order; model: Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning, hosted endpoint, free trial key): right order and broken link **6/6**; the loop named the right order **6/6** (in cases 1–5 the message carries the order number; in case 6 it starts from the payer's email only and finds the order through the payment provider); explanations passed the citation check and the per-sentence claim check **6/6**; a message quoting another customer's order number was **blocked**; the model's reply was kept **4/6** (two were replaced by the template). 62–208 s per case, mostly the free hosted model. Full log: [docs/measurements_2026-10-24_2235_zetaris.log](docs/measurements_2026-10-24_2235_zetaris.log).
+- Claim check on 30 deliberately wrong sentences (wrong amount, id, credit count, payment / credit / mail status, Korean and English) and 12 true ones (`scripts/claim_eval.py`): **30/30 wrong caught, 0/12 true rejected**.
 - The same run on DuckDB over the CSVs (21:42) gave 6/6, 6/6 and 5/6 for the loop. An earlier run on Zetaris (22:06) showed the claim check rejecting two correct sentences ("the order stayed failed", "the email failed with a 500"); the check was narrowed to payment failures and re-run (22:35).
 - The verdict never depends on the model. With a model, the loop finds case 6 (payer address only, order under a typo) in four read-only calls; without one, the fallback lookup (payer address → payment provider → order) reaches it too, and the verifier's address-mismatch check decides the verdict.
 - An earlier five-case version without the loop also ran fully on the Mac (Nemotron 3.5 Lightning 30B 4-bit, rapid-mlx): 5/5 and 5/5, about 14 s per case.
@@ -95,7 +96,7 @@ See `docs/sponsor-tech.md` for the full write-up.
 None of our product code. Open-source libraries only (`requirements.txt`). Everything in this repository was written during the build window.
 
 ## Privacy and safety
-- Seller-side tool: it reads only the seller's own merchant records (PSP ledger, orders, grants, server logs, mail events). It never touches a customer's card issuer or bank. Run it on the seller's machine (`--host 127.0.0.1`, the default); the API has no login and is not meant to be exposed.
+- Seller-side tool: it reads only the seller's own merchant records (payment-provider ledger, orders, credit grants, server logs, mail events). It never touches a customer's card issuer or bank. Run it on the seller's machine (`--host 127.0.0.1`, the default); the API has no login and is not meant to be exposed.
 - Only well-formed ids (`ord_0000`, an email address) reach SQL; anything else is refused.
 - Data path in the demo: masked rows go from the app to Nightshift on the Mac, and Nightshift sends them to NVIDIA's hosted Nemotron endpoint. Customer names or phone numbers written in a message are not masked. To keep everything on the machine, set Nightshift to local-only or point the app at a local server (rapid-mlx).
 - The address in the message decides whose records the agent may read: an order number that belongs to a different address is ignored and the page says so, and a message with no address is flagged. The seller still checks that the address really is the sender's (the tool reads pasted text, not the mail headers).
