@@ -1,6 +1,6 @@
 """The investigation loop: the model decides which records to pull next.
 
-Nemotron (served locally by Meterless Nightshift) gets the customer's message and a small set of
+Nemotron (called through Meterless Nightshift on the seller's Mac) gets the customer's message and a small set of
 read-only tools over the Zetaris layer. Each turn it answers with one JSON action — call a tool, or
 stop and name the order it believes the complaint is about. It never writes anything and never
 decides the verdict: once it names an order, the deterministic verifier walks the money chain and
@@ -125,7 +125,8 @@ def investigate_loop(client, model: str, message: str, customer_email: str, tool
         "order_journey": lambda a: tools.order_journey(_owned_order(a.get("order_id", ""))),
         "related_orders": lambda a: _note(tools.related_orders(_addr(a))),
     }
-    safe_msg = EMAIL_RE.sub(lambda m: al.email(m.group(0)), message[:2000])
+    from .investigator import mask_card_digits
+    safe_msg = mask_card_digits(EMAIL_RE.sub(lambda m: al.email(m.group(0)), message[:2000]))
     msgs = [{"role": "system", "content": SYSTEM},
             {"role": "user", "content": f"Customer message: {safe_msg}\nThe customer wrote from: CUSTOMER" + (f"\nThe seller says the order is {seed_order}." if seed_order else "")}]
     steps, seen, seen_orders = [], set(), set()

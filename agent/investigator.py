@@ -1,8 +1,8 @@
 """Investigation loop: locate -> journey -> verify chain -> explain (LLM) -> citation check.
 
-LLM: any OpenAI-compatible endpoint. Primary target is a local NVIDIA Nemotron served by
-Meterless Nightshift (customer data never leaves the seller's machine). Fallback: an
-OpenRouter Nemotron endpoint. If no endpoint is configured the agent still works: the
+LLM: any OpenAI-compatible endpoint on this machine, normally Meterless Nightshift; Nightshift routes the
+call (in the demo: to NVIDIA Nemotron 3.5 Lightning on NVIDIA's hosted endpoint; local-only is a Nightshift
+setting). Records are masked before they leave the app. If no endpoint is configured the agent still works: the
 deterministic verifier produces the verdict and a template writes the texts, and the
 result is marked `llm: none` so nobody mistakes a template for a model.
 """
@@ -79,13 +79,21 @@ def _redact(journey: dict, customer_email: str = "") -> dict:
     return {t: al.rows(rows) for t, rows in journey.items()}
 
 
+def mask_card_digits(text: str) -> str:
+    """Card digits never reach the model, wherever they appear: bullet-masked numbers from the records (also
+    JSON-escaped), full card numbers (13-19 digits, spaces or dashes allowed), and any 4-digit group written
+    near a card word ("card ending 4242", "Visa 4242", "last four 4242", "카드 끝자리 4242")."""
+    text = re.sub(r"(?:•|\\u2022){4} ?\d{4}", "•••• ****", text)
+    text = re.sub(r"\b(?:\d[ -]?){12,18}\d\b", "[card number removed]", text)
+    return re.sub(r"((?:card|visa|master(?:card)?|amex|debit|credit card|ending(?: in)?|last (?:four|4)(?: digits)?|카드|끝자리|끝 번호)[^\d\n]{0,20})\d{4}(?!\d)",
+                  r"\1****", text, flags=re.I)
+
+
 def _mask(text: str, customer_email: str) -> str:
     """Last pass over everything sent to the model: no full address survives, wherever it appears."""
     from .agent_loop import Aliaser, EMAIL_RE
     al = Aliaser(customer_email)
-    # card digits never reach the model — in plain text and in JSON-escaped text (\u2022\u2022\u2022\u2022 4242)
-    text = re.sub(r"(?:•|\\u2022){4} ?\d{4}", "•••• ****", text)
-    text = re.sub(r"(card(?:\s+ending(?:\s+in)?)?[^\d]{0,12})\d{4}\b", r"\1****", text, flags=re.I)
+    text = mask_card_digits(text)
     return EMAIL_RE.sub(lambda m: al.email(m.group(0)), text)
 
 
@@ -97,7 +105,15 @@ def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
     return (len(cited) > 0 and not bad), bad
 
 
-_FACT_NUM = re.compile(r"\b\d[\d,]{2,}\b")            # amounts, codes, years: 3+ digits
+# numbers as whole tokens: "24,900", "24 900", "₩24900" all mean 24900; "4,900" does not match 44900
+# (a number may be followed by Korean units such as 원 or 개, but not be part of a code such as std30)
+_FACT_NUM = re.compile(r"(?<![A-Za-z0-9_.,])\d{1,3}(?:[, ]\d{3})+(?![0-9]|[.,][0-9])|(?<![A-Za-z0-9_.,])\d{2,}(?![0-9A-Za-z_]|[.,][0-9])")
+_WORD_NUM = {"ten": "10", "twenty": "20", "thirty": "30", "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
+             "eighty": "80", "ninety": "90", "hundred": "100", "열": "10", "스무": "20", "서른": "30", "마흔": "40", "쉰": "50", "예순": "60"}
+
+
+def _num_tokens(values) -> set[str]:
+    return {re.sub(r"[, ]", "", m) for v in values for m in re.findall(r"\d{1,3}(?:,\d{3})+|\d+", str(v))}
 _FACT_DOMAIN = re.compile(r"@([\w-]+(?:\.[\w-]+)+)")    # the domain of an address (masked or not)
 # state words a sentence may claim, and what the cited rows must show for each
 _PAID = lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith("payments:"))
@@ -107,30 +123,56 @@ _EVENTS = lambda rows: {str(r.get("event", "")).lower() for r in rows if r.get("
 # state words a sentence may claim (English and Korean), and what the cited rows must show for each. Negated forms come
 # first; a sentence that states a negated form is not also read as claiming the positive one.
 _STATES = [
-    ("pay-", r"\b(?:payment|charge|card)\b[^.;]{0,30}\b(?:failed|declined|not completed|did not go through)\b|\b(?:never charged|no charge|not charged|wasn't charged|never paid|not paid)\b|결제[가는]?\s*(?:실패|취소|되지 않)|청구되지",
+    ("pay-", r"\b(?:payment|charge|card)\b[^.;]{0,30}\b(?:failed|declined|not completed|did not go through|cancell?ed|reversed|refunded)\b|\b(?:never charged|no charge|not charged|wasn't charged|never paid|not paid|nothing (?:was )?charged)\b|결제[가는]?\s*(?:실패|취소|되지 않|승인되지 않|거절)|승인되지\s*않|청구되지",
      # true when nothing cited is PAID, or a cited log records the failed / declined attempt itself
      lambda rows: not _PAID(rows) or any(re.search(r"fail|declin", str(r.get("message", "")), re.I) for r in rows)),
     ("pay+", r"\b(?:paid|charged|went through)\b|결제[가는]?\s*(?:완료|정상|됐|되었)",
      lambda rows: _PAID(rows) or any(str(r.get("status", "")).lower() == "paid" for r in rows if r.get("ref", "").startswith("orders:"))
                   or any("paid" in str(r.get("message", "")).lower() for r in rows)),
-    ("grant-", r"\b(?:(?:never|not|n't)\s+(?:yet\s+)?(?:been\s+)?(?:granted|credited)|no credits(?: were)?(?: granted)?|credits (?:never|did not|didn't) (?:arrive|come)|credited\s*(?:=|:)?\s*0)\b|지급되지\s*않|지급 안",
+    ("grant-", r"\b(?:(?:never|not|n't)\s+(?:yet\s+)?(?:been\s+)?(?:granted|credited)|no credits(?: were)?(?: granted)?|credits (?:never|did not|didn't) (?:arrive|come)|credited\s*(?:=|:)?\s*0)\b|(?:지급|적립)되지\s*않|(?:지급|적립) 안",
      lambda rows: not _GRANTED(rows)),
-    ("grant+", r"\b(?:granted|credited)\b|지급(?:됐|되었|했)",
+    ("grant+", r"(?:적립|지급)(?:됐|되었|했|돼)|\b(?:granted|credited|credits (?:are|were) (?:already )?in [\w' ]{0,25}account|received (?:the|their|your) credits)\b|지급(?:됐|되었|했)",
      lambda rows: _GRANTED(rows)),
-    ("mail-", r"\b(?:never delivered|not delivered|never sent|not sent|never received)\b|발송되지\s*않|받지 못",
+    ("mail-", r"\b(?:never delivered|not delivered|never sent|not sent|never received|never reached|did(?: not|n't) reach|no (?:e-?mail|mail) was sent)\b|발송되지\s*않|받지 못|도착하지 않",
      lambda rows: not ({"delivered"} & _EVENTS(rows)) and (not _EVENTS(rows) or "bounced" in _EVENTS(rows) or not ({"sent"} & _EVENTS(rows)))),
-    ("mail+", r"\bdelivered\b",
+    ("mail+", r"\b(?:delivered|reached the customer|arrived in|was received|received the (?:e-?mail|mail|confirmation|notice)|nothing (?:was )?wrong with the (?:e-?mail|mail))\b|(?:메일|안내)[^.]{0,10}(?:도착|정상적으로 발송|전달)",
      lambda rows: bool({"delivered", "sent"} & _EVENTS(rows)) and "bounced" not in _EVENTS(rows)),
     ("fail", r"\b(?:failed|failure|error)\b|실패|오류",
      lambda rows: any("fail" in " ".join(str(v).lower() for v in r.values()) or "error" in str(r.get("message", "")).lower()
                       or str(r.get("http_status", "0"))[:1] in ("4", "5") or str(r.get("event", "")).lower() == "bounced" for r in rows)),
-    ("bounce", r"\bbounced?\b|반송", lambda rows: "bounced" in _EVENTS(rows)),
+    ("bounce", r"\bbounced?\b|\b(?:rejected|returned undelivered)\b|반송|반려", lambda rows: "bounced" in _EVENTS(rows)),
+    ("ok+", r"\b(?:succeeded|successful(?:ly)?|worked|went fine|returned 200|without (?:an )?error)\b|성공|정상 처리",
+     lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows)
+                  or any(str(r.get("event", "")).lower() in ("sent", "delivered") for r in rows)
+                  or any(str(r.get("http_status", ""))[:1] == "2" and not re.search(r"fail|error|skip", str(r.get("message", "")), re.I) for r in rows)),
+    ("paystate", r"\bpayment\b[^.;]{0,25}\b(?:pending|in progress|processing|on hold)\b|결제[가는]?\s*(?:대기|진행 중)",
+     lambda rows: any(str(r.get("status", "")).upper() != "PAID" for r in rows if r.get("ref", "").startswith("payments:"))),
+    ("addr=", r"\b(?:matches|same as|identical to|the same address)\b[^.;]{0,40}\b(?:payer|paid|payment)|\b(?:payer|payment)[^.;]{0,40}\b(?:matches|same address|identical)\b",
+     lambda rows: len({str(r.get("email") or r.get("customer_email") or "").lower() for r in rows
+                       if r.get("ref", "").startswith(("orders:", "payments:"))} - {""}) == 1),
+    ("ord+", r"\border\b[^.;]{0,25}\b(?:was |is |been )?(?:confirmed|completed|fulfilled)\b|주문[이은]?\s*(?:확정|완료)",
+     lambda rows: any(str(r.get("status", "")).lower() == "paid" for r in rows if r.get("ref", "").startswith("orders:"))
+                  or any(re.search(r"\bconfirmed\b", str(r.get("message", "")), re.I) for r in rows)),
+    ("ord-", r"\border\b[^.;]{0,25}\b(?:pending|failed|(?:not|never)\s+(?:got\s+|been\s+|yet\s+)?confirmed|unconfirmed|stuck)\b|주문[이은]?\s*(?:대기|실패|확정되지)",
+     lambda rows: any(str(r.get("status", "")).lower() in ("pending", "failed") for r in rows if r.get("ref", "").startswith("orders:"))
+                  or any(re.search(r"order status is (?:failed|pending)", str(r.get("message", "")), re.I) for r in rows)),
     ("twice", r"\b(?:twice|duplicate|double|two grants)\b|두 번|중복", lambda rows: sum(1 for r in rows if r.get("ref", "").startswith("grants:")) >= 2),
     ("refund", r"\brefund(?:ed)?\b|환불(?:됐|되었|했)", lambda rows: False),  # nothing in the data is a refund
 ]
-_NEG_OF = {"pay+": "pay-", "grant+": "grant-", "mail+": "mail-"}
+_NEG_OF = {"pay+": "pay-", "grant+": "grant-", "mail+": "mail-", "ord+": "ord-", "ok+": "fail"}
+_MONTHS = {m: f"{i:02d}" for i, m in enumerate(["january", "february", "march", "april", "may", "june", "july", "august",
+                                                 "september", "october", "november", "december"], 1)}
+_CURRENCY = re.compile(r"\b(USD|EUR|JPY|GBP|dollars?|euros?|yen)\b|\$\s*\d|달러|엔화|유로", re.I)
+_TIMES = re.compile(r"\b(two|three|four|five|2|3|4|5) times\b|(두|세|네|다섯) 번", re.I)
+_TIMES_N = {"two": 2, "three": 3, "four": 4, "five": 5, "두": 2, "세": 3, "네": 4, "다섯": 5}
+_ROUTES = {"confirm": "confirm", "webhook": "webhook", "mail send": "mail/send", "mail-send": "mail/send", "checkout": "checkout"}
+_KRW_UNIT = re.compile(r"(\d+(?:\.\d+)?)\s*(만|천)\s*원")
 _IDS = re.compile(r"\b(?:ord_\d{4}|pay_[\w-]+|g_ord_[\w-]+|m_ord_[\w-]+)\b")
-_CREDITS = re.compile(r"\b(\d+)\s*(?:credits?|이용권)")
+_CREDITS = re.compile(r"\b(\d+|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)[\s-]*(?:credits?|이용권|크레딧|개)", re.I)
+_GRANT_COUNT = re.compile(r"\b(two|three|four|five|2|3|4|5)\s+(?:separate\s+|distinct\s+)?(?:credit\s+)?grants\b|(?:지급|적립)[이가은]?\s*(두|세|네|다섯)\s*(?:번|건)", re.I)
+# a cause named in the sentence must appear in the cited rows
+_CAUSES = {r"\btime(?:d)?[ -]?out\b|타임아웃|시간 초과": r"time ?out|timed out", r"\brate[ -]limit": r"rate", r"\bnetwork\b|네트워크": r"network",
+           r"\bapi key\b|인증 키|api 키": r"api key", r"\bdns\b": r"dns", r"\bspam\b|스팸": r"spam", r"\bfull mailbox|mailbox (?:is )?full|메일함이 가득": r"full"}
 
 
 def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
@@ -143,22 +185,85 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
     for sent in [x.strip() for x in re.split(r"(?<=[.!?])\s+|\n+", text) if x.strip()]:
         refs = [c.rstrip(".,;)") for c in REF_RE.findall(sent)] or cited_all
         body = REF_RE.sub("", sent)
-        facts = [n.replace(",", "") for n in _FACT_NUM.findall(body)] + _FACT_DOMAIN.findall(body)
         hay = " ".join(str(v) for r in refs for v in ref_rows.get(r, {}).values()).lower()
-        missing = [f for f in facts if f.lower() not in hay]
+        low = body.lower()
+        nums = _num_tokens(v for r in refs for v in ref_rows.get(r, {}).values())
+        body_noids = _IDS.sub(" ", body)
+        num_facts = [re.sub(r"[, ]", "", n) for n in _FACT_NUM.findall(body_noids)]
+        facts = num_facts + _FACT_DOMAIN.findall(body)
+        missing = [n for n in num_facts if n not in nums] + [d for d in _FACT_DOMAIN.findall(body) if d.lower() not in hay]
+        # dates written in Korean ("10월 14일") must be the date of a cited row
+        for mo, dy in re.findall(r"(\d{1,2})월\s*(\d{1,2})일", body):
+            stamp = f"-{int(mo):02d}-{int(dy):02d}"
+            facts.append(f"{mo}월 {dy}일")
+            if stamp not in hay:
+                missing.append(f"{mo}월 {dy}일")
+        # product / reward codes (std30, lite10 …) named in the sentence must be the cited rows' code
+        codes = {str(r.get("reward_key", "")).lower() for r in ref_rows.values()} - {""}
+        for c in codes:
+            if re.search(r"(?<![a-z0-9])" + re.escape(c) + r"(?![a-z0-9])", low):
+                facts.append(c)
+                if c not in hay:
+                    missing.append(c)
+        for pat, need in _CAUSES.items():
+            if re.search(pat, low):
+                facts.append(re.search(pat, low).group(0))
+                if not re.search(need, hay):
+                    missing.append(re.search(pat, low).group(0))
+        for a, b in _GRANT_COUNT.findall(low):
+            tok = (a or b).lower(); n = _TIMES_N.get(tok) or int(tok)
+            facts.append(f"{tok} grants")
+            if sum(1 for r in cited_all if r.startswith("grants:")) != n:
+                missing.append(f"{tok} grants")
+        # amounts written with Korean units ("3만 원" = 30000)
+        for q, unit in _KRW_UNIT.findall(body):
+            n = str(int(float(q) * (10000 if unit == "만" else 1000)))
+            facts.append(f"{q}{unit} 원")
+            if n not in nums:
+                missing.append(f"{q}{unit} 원")
+        # a month (and day) named in the sentence must be the date of a cited row
+        for mname, day in re.findall(r"\b(" + "|".join(_MONTHS) + r")\s+(\d{1,2})?", low):
+            stamp = f"-{_MONTHS[mname]}-" + (f"{int(day):02d}" if day else "")
+            facts.append(f"{mname} {day}".strip())
+            if stamp not in hay:
+                missing.append(f"{mname} {day}".strip())
+        # a currency other than the cited payment's
+        for m in _CURRENCY.finditer(body):
+            facts.append(m.group(0))
+            if not any(str(r.get("currency", "")).upper() in m.group(0).upper() for r in [dict(ref_rows[x], ref=x) for x in refs if x in ref_rows]):
+                missing.append(m.group(0))
+        # an endpoint named together with a cited log row must be that row's route
+        logs = [ref_rows[r] for r in refs if r.startswith("server_logs:") and r in ref_rows]
+        for word, route in _ROUTES.items():
+            if logs and re.search(r"\b" + word + r"\s+(?:endpoint|step|call|route|request|handler)\b", low) and not any(route in str(l.get("route", "")) for l in logs):
+                facts.append(word); missing.append(f"{word} (not the cited endpoint)")
         rows = [dict(ref_rows[r], ref=r) for r in refs if r in ref_rows]
         low = body.lower()
         # ids named in the sentence (orders, payments, grants, mails) must be in the rows it cites
         for i in _IDS.findall(body):
             facts.append(i)
-            if i.lower() not in hay:
-                missing.append(i)
+            if i.lower() in hay:
+                continue
+            # an order named next to its own payment row: the order row (from the same journey) carries that payment_id
+            o = ref_rows.get(f"orders:{i}")
+            if o and any(str(ref_rows.get(r, {}).get("payment_id", "")) == str(o.get("payment_id")) for r in refs if r.startswith("payments:")):
+                continue
+            missing.append(i)
         # "N credits" at any digit count must match a cited grant
         for n in _CREDITS.findall(body):
+            n = _WORD_NUM.get(n.lower(), n)
             facts.append(f"{n} credits")
             if not any(str(r.get("credits", "")) == n for r in rows):
                 missing.append(f"{n} credits")
         hit = {name for name, pat, _ in _STATES if re.search(pat, low)}
+        # "N times" about grants must match the number of grant rows cited in the explanation
+        for a, b in _TIMES.findall(low):
+            tok = (a or b).lower()
+            n = _TIMES_N.get(tok) or int(tok)
+            if "grant" in low or "credit" in low or "지급" in low:
+                facts.append(f"{tok} times")
+                if sum(1 for r in cited_all if r.startswith("grants:")) != n:
+                    missing.append(f"{tok} times")
         # a recommendation ("needs to be granted", "should re-check", "해야") states no fact about the data
         if re.search(r"\b(?:needs? to|should|must|has to|have to|will need|to be done|recommend)\b|해야|필요합니다", low):
             hit &= {"refund"}  # a promised refund is still checked
@@ -294,12 +399,15 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
                         "claims_ok": claims_ok}
             ok = ok and claims_ok
             texts["fix_action"] = verdict.suggested_fix  # the fix is decided by the verifier, never by the model
-            if not _reply_ok(texts.get("customer_reply", ""), verdict):
-                texts["customer_reply"] = _template_reply(verdict, lang); citation["reply_replaced"] = True
+            why_not = _reply_problem(texts.get("customer_reply", ""), verdict)
+            if why_not:
+                print(f"[investigator] model reply not used ({why_not}): {texts.get('customer_reply', '')[:300]!r}", flush=True)
+                texts["customer_reply"] = _template_reply(verdict, lang)
+                citation["reply_replaced"] = True; citation["reply_reason"] = why_not
             if ok and re.search(r"refund|compensat|discount|voucher|환불|보상|할인", texts.get("explanation", ""), re.I):
                 ok = False  # money is a person's decision; a steered explanation falls back to the verifier's text
             if not ok:
-                texts["explanation"] = verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs)
+                texts["explanation"] = verdict.root_cause + " " + " ".join(f"[{r}]" for r in dict.fromkeys(r for l in verdict.links if l.state == "red" for r in l.refs))
                 citation["replaced_with_verifier_text"] = True
             mark("llm_explain", f"{model} citations_ok={ok}")
         except Exception as e:  # keep the demo honest: show that the model step failed
@@ -308,7 +416,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             # nothing listening at the configured address (e.g. Nightshift not running) is not a model failure
             llm_used = "unreachable" if "Connection" in type(e).__name__ else "failed"
     if texts is None:
-        texts = {"explanation": verdict.root_cause + " " + " ".join(f"[{r}]" for l in verdict.links if l.state == "red" for r in l.refs),
+        texts = {"explanation": verdict.root_cause + " " + " ".join(f"[{r}]" for r in dict.fromkeys(r for l in verdict.links if l.state == "red" for r in l.refs)),
                  "customer_reply": _template_reply(verdict, lang), "fix_action": verdict.suggested_fix}
         mark("template_texts", {"failed": "model call failed — verifier text used", "unreachable": "no model reachable — verifier text used", "verifier-only": "re-check after a fix — verifier only"}.get(llm_used, "no LLM endpoint configured — verifier text used"))
 
@@ -328,22 +436,32 @@ REPLY_MUST = {None: r"never charged|not charged|no charge|wasn't charged|was not
 
 
 def _reply_ok(reply: str, v) -> bool:
-    """The reply must be the seller speaking and must carry the verdict; otherwise the template is safer."""
-    if not reply or re.search(r"\b(let me check my account|you gave me|my order|my credits)\b", reply, re.I):
-        return False
-    if re.search(r"refund|compensat|discount|free|voucher|환불|보상|할인|무료", reply, re.I):
-        return False  # the model may not promise money; a person decides that
+    return _reply_problem(reply, v) is None
+
+
+def _reply_problem(reply: str, v) -> str | None:
+    """Why the model's reply can't be sent (None if it can). The reply must be the seller speaking and must carry
+    the verdict; otherwise the template is safer."""
+    if not reply:
+        return "empty"
+    if re.search(r"\b(let me check my account|you gave me|my order|my credits)\b", reply, re.I):
+        return "written as the customer"
+    # "feel free to reply" is fine; "for free" / "a free month" is a promise of money
+    if re.search(r"refund|compensat|discount|voucher|\bfor free\b|free of charge|\bfree (?:credits?|month|pack|plan|book)|환불|보상|할인|무료", reply, re.I):
+        return "promises money"
     if v.broken == "account_mismatch" and (not re.search(r"confirm|확인해", reply, re.I)
                                            or re.search(r"(are|am|we're|i'm) (now )?moving|right away|already moved|옮기고 있|옮겼", reply, re.I)):
-        return False  # credits move only after the customer confirms and the seller approves
+        return "moves credits before the customer confirms"  # credits move only after confirmation and approval
     if re.search(r"\*\*\*@|\bCUSTOMER\b", reply):
-        return False  # masked placeholders are for the model, never for the customer
+        return "contains a masked placeholder"  # placeholders are for the model, never for the customer
     if re.search(r"where you('d| would) like|which (email|address)|(send|give|tell) (us|me) (the|your|an?) (new |other |different )?(email|address)|another (email|address)|new (email|address)|원하시는 (주소|이메일)|다른 (주소|이메일)을 알려", reply, re.I):
-        return False  # the fix only moves credits to the payer's own address; never invite an arbitrary one
+        return "asks for a different address"  # the fix only moves credits to the payer's own address
     key = v.broken if v.broken in REPLY_MUST else None
     if key is None and "never charged" not in v.headline.lower() and v.broken is None:
-        return bool(re.search(r"in your account|went through|everything|이용권|계정", reply, re.I))
-    return bool(re.search(REPLY_MUST[key], reply, re.I))
+        must = r"in your account|went through|everything|이용권|계정"
+    else:
+        must = REPLY_MUST[key]
+    return None if re.search(must, reply, re.I) else "does not state the finding"
 
 
 def _template_reply(v, lang: str = "en") -> str:

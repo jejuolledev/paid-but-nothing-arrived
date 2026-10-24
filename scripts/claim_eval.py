@@ -80,6 +80,13 @@ FALSE = [
     f"Duplicate credits were issued {G4}.",                                 # single grant
 ]
 
+# docs/eval/heldout_*.py: sentence sets written by a separate agent that never saw the checker code
+import importlib.util  # noqa: E402
+HELD = {}
+for f in sorted((ROOT / "docs/eval").glob("heldout_*.py")):
+    spec = importlib.util.spec_from_file_location(f.stem, f); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    HELD[f.stem] = (m.WRONG, m.TRUE)
+
 caught = sum(1 for s in FALSE if not _claims_ok(s, ROWS)[0])
 rejected = [s for s in TRUE if not _claims_ok(s, ROWS)[0]]
 missed = [s for s in FALSE if _claims_ok(s, ROWS)[0]]
@@ -95,3 +102,11 @@ if "--record" in sys.argv:
     md = ROOT / "docs/measurements.md"
     md.write_text(md.read_text() + line + "\n")
 print(line)
+for name, (wrong, true) in HELD.items():
+    c = sum(1 for x in wrong if not _claims_ok(x, ROWS)[0]); r = [x for x in true if not _claims_ok(x, ROWS)[0]]
+    print(f"{name}: wrong caught {c}/{len(wrong)}, true wrongly rejected {len(r)}/{len(true)}")
+    for x in wrong:
+        if _claims_ok(x, ROWS)[0]:
+            print("  MISSED:", x)
+    for x in r:
+        print("  REJECTED:", x)

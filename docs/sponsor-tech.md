@@ -9,7 +9,7 @@ Zetaris is the only thing the agent queries. The four systems a seller would oth
 | `psp_pg` | the payment provider's ledger | payments |
 | `mail_pg` | the mail provider's events | mail_events |
 
-All five tables are activated into one unified semantic layer, `order_journey`. For an order's full history the agent sends **one SQL statement** that joins the five tables across the three datasources (`agent/tools.py`, `order_journey`); Zetaris federates it, nothing is copied out of the sources, and the joined rows are split back into per-source rows so each one keeps its `table:key` ref. The page shows that statement above the evidence rows, and the SQL behind every step of the investigation (`docs/demo/zetaris_ui/30_journey_query_in_zetaris.png` is the same query run in Zetaris's SQL Workspace; `31_three_datasources.png` is `SHOW DATASOURCES`).
+All five tables are activated into one unified semantic layer, `order_journey`. For an order's full history the agent sends **one SQL statement** that joins the five tables across the three datasources (`agent/tools.py`, `order_journey`); Zetaris federates it, nothing is copied out of the sources, and the joined rows are split back into per-source rows so each one keeps its `table:key` ref. The page shows that statement above the evidence rows, and the SQL behind every step of the investigation (`docs/demo/zetaris_ui/30_journey_query_in_zetaris.png` is the same joins run by hand in Zetaris's SQL Workspace, with a shorter column list; `31_three_datasources.png` is `SHOW DATASOURCES`).
 
 - Measured on the local platform: the journey query takes about 6–9 s warm (Docker on an Apple-silicon laptop).
 

@@ -164,6 +164,7 @@ const I18N={
     fixedByYou:'Fixed by you',
     sendAfterFix:'Send this after the fix:',
     sendAfterApprove:'Send this only after you approve the fix below.',
+    replyTemplate:w=>`Standard reply: the model’s draft was not used (${w}).`,
     before:'Before',
     after:'After',
     actionId:'Action',
@@ -234,6 +235,7 @@ const I18N={
     fixedByYou:'직접 수정함',
     sendAfterFix:'수정 후 보낼 답장:',
     sendAfterApprove:'아래 수정을 승인한 뒤에만 보내세요.',
+    replyTemplate:w=>`기본 답장: 모델이 쓴 답장은 쓰지 않았습니다(${w}).`,
     before:'이전',
     after:'이후',
     actionId:'액션',
@@ -501,7 +503,9 @@ function render(r, opts){
   const fixTag=needsFix
     ?`<span class="tag warn">${esc(i.needsApproval)}</span>`
     :`<span class="tag ok">${esc(i.noFixNeeded)}</span>`;
-  const replyNote=afterFix?`<p class="reply-note">${esc(i.sendAfterFix)}</p>`:(needsFix?`<p class="reply-note">${esc(i.sendAfterApprove)}</p>`:'');
+  const rc=r.citation_check||{};
+  const tplNote=rc.reply_replaced?`<p class="reply-note">${esc(i.replyTemplate(rc.reply_reason||'check failed'))}</p>`:'';
+  const replyNote=tplNote+(afterFix?`<p class="reply-note">${esc(i.sendAfterFix)}</p>`:(needsFix?`<p class="reply-note">${esc(i.sendAfterApprove)}</p>`:''));
 
   $('#out').innerHTML=`
   ${renderFixCard()}

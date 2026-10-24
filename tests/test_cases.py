@@ -247,3 +247,21 @@ def test_claim_check_eval_catches_all_wrong_sentences():
     out = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve().parent.parent / "scripts/claim_eval.py")],
                          capture_output=True, text=True, check=True).stdout
     assert "wrong sentences caught 30/30" in out and "wrongly rejected 0/16" in out
+
+
+def test_typed_card_digits_never_reach_the_model():
+    from agent.investigator import mask_card_digits
+    for msg in ["I paid with my Visa 4242", "카드 끝자리 4242로 결제했어요", "last four 4242", "card number 4242 4242 4242 4242",
+                "my card ending in 4242 was charged"]:
+        assert "4242" not in mask_card_digits(msg), msg
+    assert "24,900" in mask_card_digits("I paid 24,900 won for order ord_0901")  # amounts and order ids stay
+
+
+def test_reply_check_reasons():
+    from agent.investigator import _reply_problem
+    from agent.chain import verify
+    from agent.tools import Tools
+    from agent.sql_backend import DuckDBBackend
+    v = verify(Tools(DuckDBBackend()).order_journey("ord_0905"))
+    assert _reply_problem("I checked: you were never charged. Feel free to reply anytime.", v) is None
+    assert _reply_problem("You were never charged, and we'll add a free month.", v) == "promises money"
