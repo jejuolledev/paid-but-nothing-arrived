@@ -7,7 +7,7 @@ The form has five fields: Track, Description (150–2000 characters), Video (lin
 Track 02 — The Agent That Can Explain Why
 ```
 
-## Description (1986 characters)
+## Description (1958 characters)
 ```
 I run a small online shop. The message I dread most is "I paid 24,900 won and nothing arrived." If I'm slow to answer, it turns into a chargeback. The answer is split across the payment provider, our orders database, the server logs and the mail provider.
 
@@ -17,7 +17,7 @@ The model doesn't get the final word. A rule-based verifier walks the money chai
 
 Emails and card digits are masked before anything reaches the model.
 
-Tested on Zetaris with six cases rebuilt from real bugs in my own shop (all data synthetic): right order and broken step 6/6, and every explanation passed the sentence check. Given only the payer's email, the agent tracked down the order itself. 22 automated tests. Built with Cursor.
+Tested on Zetaris with six cases rebuilt from real bugs in my own shop (all data synthetic): right order and broken step 6/6 in each of four runs. Given only the payer's email, the agent tracked down the order itself. 22 automated tests. Built with Cursor.
 ```
 
 ## Video

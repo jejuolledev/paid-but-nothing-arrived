@@ -17,7 +17,7 @@ const LINES = {
   N08: 'And when nothing is broken, it says so: you were never charged.',
   N08b: 'And if a message quotes someone else’s order number, that order is never read.',
   N09: 'Under the hood: the shop database, the payment provider’s ledger and the mail provider’s events are three separate sources in Zetaris, joined in one semantic layer and read with a single query. Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model.',
-  N10: 'Six cases, rebuilt from real bugs in our own shop with synthetic data: the right order and broken link, six out of six, and every explanation passed the sentence check.',
+  N10: 'Six cases, rebuilt from real bugs in our own shop with synthetic data: the right order and broken link, six out of six, on every run. And thirty out of thirty deliberately wrong sentences were caught.',
   N11: 'Paid, but nothing arrived? Found in one pass.',
 };
 // long lines are split into two halves so a strip never holds more than two rows
@@ -42,8 +42,8 @@ await shot(`<div style="position:absolute;left:26px;top:22px;background:#0b2e1a;
 const card = (inner) => `<div style="width:1920px;height:1080px;background:#0f1115;color:#e8eaf0;padding:200px 150px">${inner}</div>`;
 await shot(card(`<div style="font-size:30px;color:#9aa3b2;letter-spacing:.08em;text-transform:uppercase">Measured</div>
 <div style="font-size:64px;font-weight:800;margin:16px 0 50px">6 cases from our own shop, synthetic data</div>
-<div style="display:flex;gap:40px">${[['6 / 6', 'right order and right broken link'], ['6 / 6', 'explanations pass the citation and sentence check'], ['30 / 30', 'deliberately wrong sentences caught by the sentence check']].map(([n, t]) => `<div style="flex:1;border:2px solid #2a2f3a;border-radius:18px;padding:34px 36px"><div style="font-size:92px;font-weight:800;color:#7ee2a8">${n}</div><div style="font-size:32px;color:#c3c9d4;margin-top:8px">${t}</div></div>`).join('')}</div>
-<div style="font-size:28px;color:#9aa3b2;margin-top:46px">Final code on the local Zetaris platform (three datasources, one query per order), Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted, free key). A message quoting another customer’s order was refused. 22 automated tests.</div>`), 'card_measured', false);
+<div style="display:flex;gap:40px">${[['6 / 6', 'right order and right broken link, in four runs on Zetaris'], ['30 / 30', 'deliberately wrong sentences caught by the sentence check'], ['22', 'automated tests']].map(([n, t]) => `<div style="flex:1;border:2px solid #2a2f3a;border-radius:18px;padding:34px 36px"><div style="font-size:92px;font-weight:800;color:#7ee2a8">${n}</div><div style="font-size:32px;color:#c3c9d4;margin-top:8px">${t}</div></div>`).join('')}</div>
+<div style="font-size:28px;color:#9aa3b2;margin-top:46px">Final code on the local Zetaris platform (three datasources, one query per order), Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted, free key). A message quoting another customer’s order was refused in every run. When a sentence fails the check, the verifier’s text is shown instead.</div>`), 'card_measured', false);
 await shot(card(`<div style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
 <div style="font-size:96px;font-weight:800">Paid, but nothing arrived?</div><div style="font-size:52px;color:#7ee2a8;margin-top:18px">Found in one pass.</div>
 <div style="font-size:30px;color:#9aa3b2;margin-top:60px">Zetaris · Meterless Nightshift · NVIDIA Nemotron · built with Cursor</div>

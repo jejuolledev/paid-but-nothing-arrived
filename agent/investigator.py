@@ -113,7 +113,7 @@ _STATES = [
     ("pay+", r"\b(?:paid|charged|went through)\b|결제[가는]?\s*(?:완료|정상|됐|되었)",
      lambda rows: _PAID(rows) or any(str(r.get("status", "")).lower() == "paid" for r in rows if r.get("ref", "").startswith("orders:"))
                   or any("paid" in str(r.get("message", "")).lower() for r in rows)),
-    ("grant-", r"\b(?:never granted|not granted|no credits (?:were )?granted|credits (?:never|did not) (?:arrive|come))\b|지급되지\s*않|지급 안",
+    ("grant-", r"\b(?:(?:never|not|n't)\s+(?:yet\s+)?(?:been\s+)?(?:granted|credited)|no credits(?: were)?(?: granted)?|credits (?:never|did not|didn't) (?:arrive|come)|credited\s*(?:=|:)?\s*0)\b|지급되지\s*않|지급 안",
      lambda rows: not _GRANTED(rows)),
     ("grant+", r"\b(?:granted|credited)\b|지급(?:됐|되었|했)",
      lambda rows: _GRANTED(rows)),
