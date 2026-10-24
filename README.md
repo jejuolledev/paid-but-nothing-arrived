@@ -15,7 +15,9 @@ It also knows how to say *nothing is broken*: when there is no charge at the PSP
 **Track:** 02 — The Agent That Can Explain Why. **Team:** MoaHub (solo).
 
 ## Demo video
-_(link added at submission)_
+[![Demo video](docs/demo/thumbnail.png)](https://youtu.be/Pzv--B0HpU8)
+
+https://youtu.be/Pzv--B0HpU8 (2:08). Slides: [docs/slides.pdf](docs/slides.pdf).
 
 ## How it works
 ```

@@ -22,7 +22,7 @@ Measured on the final code with six cases rebuilt from bugs in our own shop: rig
 
 ## Video
 ```
-<YouTube link of docs/demo/final_v2.mp4>
+https://youtu.be/Pzv--B0HpU8
 ```
 
 ## GitHub repository
