@@ -41,7 +41,7 @@
  ],
  "N10": [
   "Six cases, rebuilt from real bugs in our own shop with synthetic data: the right order and broken link, six out of six, on every run.",
-  "And on wrong sentences written by a separate model that never saw the checker, it caught thirty-three of forty."
+  "And on wrong sentences written by a separate model that never saw the checker, it caught thirty-two of forty."
  ],
  "N11": [
   "Paid, but nothing arrived? Found in one pass."

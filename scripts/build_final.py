@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parent.parent
 D = ROOT / "docs/demo"
 PARTS, TMP = D / "final_parts", D / "final_parts/_seg"
 TMP.mkdir(parents=True, exist_ok=True)
-LIVE = next((D / "take_case6").glob("page@*.webm"))          # Zetaris + Nightshift run (case 6)
-CASE5 = next((D / "take_final").glob("page@*.webm"))  # the 23:05 run: case 5 with a quoted foreign order number
+LIVE = next((D / "take_final").glob("page@*.webm"))          # Zetaris + Nightshift run, final code (case 6, then case 5)
+CASE5 = LIVE  # the same run continues with case 5 (and a quoted foreign order number)
 OFF = next((D / "take_offline").glob("page@*.webm"))          # offline DuckDB run, used for the approve beat
 COMIC, ZUI, NUI = D.parent / "comic", D / "zetaris_ui", D / "nightshift_ui"
 W, H, FPS, LEAD, GAP = 1920, 1080, 30, 0.25, 0.5
@@ -62,12 +62,12 @@ L = {k: dur(p) for k, p in vo.items()}
 slot = {k: L[k] + GAP for k in L}
 slot["N11"] += 1.5  # title card holds a moment after the last line
 
-f_live_result = frame(LIVE, 357.4, TMP / "live_result.png")        # chain + reply + fix on screen
-f_live_sql = frame(LIVE, 364.7, TMP / "live_sql.png")              # a timeline step with its SQL opened
-f_live_why = frame(LIVE, 368.8, TMP / "live_why.png")             # Why: per-sentence checks
-f_live_rows = frame(LIVE, 374.7, TMP / "live_rows.png")           # the one journey query above the rows
-f_status = frame(LIVE, 376.2, TMP / "status.png")                 # "Answered by … Data: Zetaris" + the Nightshift receipt
-f_case5 = frame(CASE5, 324.4, TMP / "case5.png")                    # never charged + the refused foreign order
+f_live_result = frame(LIVE, 155.5, TMP / "live_result.png")        # chain + reply + fix on screen
+f_live_sql = frame(LIVE, 159.6, TMP / "live_sql.png")              # a timeline step with its SQL opened
+f_live_why = frame(LIVE, 164.6, TMP / "live_why.png")             # Why: per-sentence checks
+f_live_rows = frame(LIVE, 170.6, TMP / "live_rows.png")           # the one journey query above the rows
+f_status = frame(LIVE, 173.5, TMP / "status.png")                 # "Answered by … Data: Zetaris" + the Nightshift receipt
+f_case5 = frame(CASE5, 384.16, TMP / "case5.png")                    # never charged + the refused foreign order
 f_zq = ZUI / "30_journey_query_in_zetaris.png"
 f_zd = ZUI / "31_three_datasources.png"
 CHAIN, REPLYFIX = (240, 0, 960, 540), (240, 250, 960, 540)
@@ -77,16 +77,16 @@ PLAN = {
     "N01": [("still", (COMIC / "panel_P1.png",), None)],
     "N02": [("still", (COMIC / "panel_P2.png",), 6.5), ("still", (COMIC / "panel_P3.png",), None)],
     "N03": [("clip", (LIVE, 0.6, 5.9), None, {"crop": (240, 60, 960, 540)})],
-    "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 355.9, 358.1), 2.2, {"crop": (240, 0, 960, 540)}),
-            ("clip", (LIVE, 362.3, 365.7), 3.4, {"crop": (240, 360, 960, 540)}),
+    "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 152.3, 154.5), 2.2, {"crop": (240, 0, 960, 540)}),
+            ("clip", (LIVE, 157.4, 160.8), 3.4, {"crop": (240, 360, 960, 540)}),
             ("still", (f_live_sql,), None, {"crop": (240, 360, 960, 540), "zoom": (1.0, 1.08)})],
     "N05": [("still", (COMIC / "panel_P5.png",), 3.5), ("still", (f_live_result,), 4.5, {"crop": CHAIN}),
-            ("clip", (LIVE, 370.8, 372.3), 1.5, {"crop": (240, 0, 960, 540)}),
+            ("clip", (LIVE, 169.6, 171.1), 1.5, {"crop": (240, 0, 960, 540)}),
             ("still", (f_live_rows,), None, {"crop": (240, 0, 960, 540), "zoom": (1.0, 1.06)})],
     "N05b": [("still", (f_live_why,), None, {"crop": (240, 200, 960, 540), "zoom": (1.0, 1.1)})],
-    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 377.3, 380.2), None, {"crop": (240, 200, 960, 540)})],
+    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 173.8, 176.7), None, {"crop": (240, 200, 960, 540)})],
     "N07": [("clip", (OFF, "approve-0.6", "after_fix+0.3"), None, {"crop": (240, 0, 960, 540)})],
-    "N08": [("clip", (CASE5, 321.7, 324.2), None, {"crop": (240, 0, 960, 540)})],
+    "N08": [("clip", (CASE5, 381.46, 383.96), None, {"crop": (240, 0, 960, 540)})],
     "N08b": [("still", (f_case5,), 2.6, {"crop": (240, 0, 960, 540), "zoom": (1.0, 1.12)}),
              ("still", (f_case5,), None, {"crop": (240, 400, 960, 540), "zoom": (1.0, 1.06)})],
     "N09": [("still", (f_zd,), 3.6, {"crop": (550, 776, 1000, 124)}), ("still", (f_zq,), 3.6, {"crop": (560, 150, 840, 180)}), ("still", (f_zq,), 3.9, {"crop": (550, 776, 1340, 96)}),

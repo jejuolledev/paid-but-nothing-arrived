@@ -19,3 +19,4 @@
 | 2026-10-25 01:26 | nvidia/nemotron-3.5-lightning-30b-a3b (data: zetaris-jdbc) | verdict 6/6; agent loop named the order 4/6; model reply kept 5/6; cross-customer probe blocked | citations passed 2/6 | avg 134142 ms |
 | 2026-10-25 01:29 | claim check (scripts/claim_eval.py) | wrong sentences caught 30/30; true sentences wrongly rejected 0/21 | — | — |
 | 2026-10-25 01:29 | claim check, unseen set heldout_3 | wrong caught 32/40; true wrongly rejected 2/20 | — | — |
+| 2026-10-25 01:52 | nvidia/nemotron-3.5-lightning-30b-a3b (data: zetaris-jdbc) | verdict 6/6; agent loop named the order 6/6; model reply kept 5/6; cross-customer probe blocked | citations passed 5/6 | avg 143347 ms |
