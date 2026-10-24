@@ -107,4 +107,4 @@ None of our product code. Open-source libraries only (`requirements.txt`). Every
 - Model output is advisory. A fix runs only after the seller clicks Approve (offline demo); moving credits to another address also needs the customer's confirmation. On Zetaris the agent is read-only.
 
 ## License
-MIT
+MIT — see [LICENSE](LICENSE).
