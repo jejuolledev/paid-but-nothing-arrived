@@ -49,7 +49,7 @@ Every link is green up to the one that broke. Click the link → the raw row tha
 2. `order_journey` — one read-only SQL statement to Zetaris, joining five tables across three datasources
 3. deterministic verifier: each link green / red / grey, with refs
 4. Nemotron (via Nightshift) explains and drafts the reply; the fix comes from the verifier
-5. citation + claim check: the explanation may cite only returned `ref`s, and every amount, record id, email domain and payment, credit or mail status in each sentence must match the rows it cites (30/30 wrong sentences caught in `scripts/claim_eval.py`) — or it is replaced by the verifier's text
+5. citation + claim check: the explanation may cite only returned `ref`s, and every amount, record id, email domain and payment, credit or mail status in each sentence must match the rows it cites (on unseen sentences from a separate model: 33/40 wrong caught) — or it is replaced by the verifier's text
 
 ---
 
@@ -79,7 +79,7 @@ The agent's journey query in Zetaris's SQL Workspace: three datasources, one sta
 
 - Every model call goes through Nightshift on the Mac: a Nemotron lane (NVIDIA's hosted endpoint in the demo), a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured on Zetaris (three datasources), four runs: right order and link 6/6 every run, loop named the order 6/6 every run, cross-customer probe blocked every run; claim check 30/30 wrong sentences caught; 22 automated tests.
+- Measured on Zetaris (three datasources), four runs: right order and link 6/6 every run, loop named the order 6/6 every run, cross-customer probe blocked every run; claim check on unseen sentences: 33/40 wrong caught, 3/20 true wrongly rejected; 24 automated tests.
 
 ---
 

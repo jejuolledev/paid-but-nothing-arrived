@@ -98,6 +98,10 @@ for s in rejected:
     print("  REJECTED:", s, _claims_ok(s, ROWS)[1])
 line = (f"| {time.strftime('%Y-%m-%d %H:%M')} | claim check (scripts/claim_eval.py) | wrong sentences caught {caught}/{len(FALSE)}; "
         f"true sentences wrongly rejected {len(rejected)}/{len(TRUE)} | — | — |")
+for name, (wrong, true) in HELD.items():
+    if not name.endswith("_seen"):
+        c = sum(1 for x in wrong if not _claims_ok(x, ROWS)[0]); r = sum(1 for x in true if not _claims_ok(x, ROWS)[0])
+        line += f"\n| {time.strftime('%Y-%m-%d %H:%M')} | claim check, unseen set {name} | wrong caught {c}/{len(wrong)}; true wrongly rejected {r}/{len(true)} | — | — |"
 if "--record" in sys.argv:
     md = ROOT / "docs/measurements.md"
     md.write_text(md.read_text() + line + "\n")
