@@ -118,6 +118,7 @@ _FACT_DOMAIN = re.compile(r"@([\w-]+(?:\.[\w-]+)+)")    # the domain of an addre
 # state words a sentence may claim, and what the cited rows must show for each
 _PAID = lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows if r.get("ref", "").startswith("payments:"))
 _GRANTED = lambda rows: any(r.get("ref", "").startswith("grants:") and str(r.get("status", "")).lower() == "granted" for r in rows) \
+    or any(re.search(r"credits? granted|granted \d+ credits", str(r.get("message", "")), re.I) for r in rows) \
     or any(r.get("ref", "").startswith("orders:") and str(r.get("credited", "")) == "1" for r in rows)
 _EVENTS = lambda rows: {str(r.get("event", "")).lower() for r in rows if r.get("ref", "").startswith("mail_events:")}
 # state words a sentence may claim (English and Korean), and what the cited rows must show for each. Negated forms come
@@ -137,7 +138,7 @@ _STATES = [
      lambda rows: not ({"delivered"} & _EVENTS(rows)) and (not _EVENTS(rows) or "bounced" in _EVENTS(rows) or not ({"sent"} & _EVENTS(rows)))),
     ("mail+", r"\b(?:delivered|reached the customer|arrived in|was received|received the (?:e-?mail|mail|confirmation|notice)|nothing (?:was )?wrong with the (?:e-?mail|mail))\b|(?:메일|안내)[^.]{0,10}(?:도착|정상적으로 발송|전달)",
      lambda rows: bool({"delivered", "sent"} & _EVENTS(rows)) and "bounced" not in _EVENTS(rows)),
-    ("fail", r"\b(?:failed|failure|error)\b|실패|오류",
+    ("fail", r"\b(?:failed|failure|error|errored(?: out)?|blew up|crashed)\b|실패|오류",
      lambda rows: any("fail" in " ".join(str(v).lower() for v in r.values()) or "error" in str(r.get("message", "")).lower()
                       or str(r.get("http_status", "0"))[:1] in ("4", "5") or str(r.get("event", "")).lower() == "bounced" for r in rows)),
     ("bounce", r"\bbounced?\b|\b(?:rejected|returned undelivered)\b|반송|반려", lambda rows: "bounced" in _EVENTS(rows)),
@@ -145,7 +146,7 @@ _STATES = [
      lambda rows: any(str(r.get("status", "")).upper() == "PAID" for r in rows)
                   or any(str(r.get("event", "")).lower() in ("sent", "delivered") for r in rows)
                   or any(str(r.get("http_status", ""))[:1] == "2" and not re.search(r"fail|error|skip", str(r.get("message", "")), re.I) for r in rows)),
-    ("paystate", r"\bpayment\b[^.;]{0,25}\b(?:pending|in progress|processing|on hold)\b|결제[가는]?\s*(?:대기|진행 중)",
+    ("paystate", r"(?<!no )\bpayment\b(?! linked| row| record)[^.;]{0,45}\b(?:pending|in progress|processing|on hold)\b|결제[가는]?\s*(?:대기|진행 중)",
      lambda rows: any(str(r.get("status", "")).upper() != "PAID" for r in rows if r.get("ref", "").startswith("payments:"))),
     ("addr=", r"\b(?:matches|same as|identical to|the same address)\b[^.;]{0,40}\b(?:payer|paid|payment)|\b(?:payer|payment)[^.;]{0,40}\b(?:matches|same address|identical)\b",
      lambda rows: len({str(r.get("email") or r.get("customer_email") or "").lower() for r in rows
@@ -168,11 +169,84 @@ _TIMES_N = {"two": 2, "three": 3, "four": 4, "five": 5, "두": 2, "세": 3, "네
 _ROUTES = {"confirm": "confirm", "webhook": "webhook", "mail send": "mail/send", "mail-send": "mail/send", "checkout": "checkout"}
 _KRW_UNIT = re.compile(r"(\d+(?:\.\d+)?)\s*(만|천)\s*원")
 _IDS = re.compile(r"\b(?:ord_\d{4}|pay_[\w-]+|g_ord_[\w-]+|m_ord_[\w-]+)\b")
-_CREDITS = re.compile(r"\b(\d+|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)[\s-]*(?:credits?|이용권|크레딧|개)", re.I)
+_CREDITS = re.compile(r"\b(\d+|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)[\s-]*(?:(?:extra|more|additional|bonus|reward)\s+)?(?:credits?|이용권|크레딧|개)", re.I)
 _GRANT_COUNT = re.compile(r"\b(two|three|four|five|2|3|4|5)\s+(?:separate\s+|distinct\s+)?(?:credit\s+)?grants\b|(?:지급|적립)[이가은]?\s*(두|세|네|다섯)\s*(?:번|건)", re.I)
 # a cause named in the sentence must appear in the cited rows
 _CAUSES = {r"\btime(?:d)?[ -]?out\b|타임아웃|시간 초과": r"time ?out|timed out", r"\brate[ -]limit": r"rate", r"\bnetwork\b|네트워크": r"network",
            r"\bapi key\b|인증 키|api 키": r"api key", r"\bdns\b": r"dns", r"\bspam\b|스팸": r"spam", r"\bfull mailbox|mailbox (?:is )?full|메일함이 가득": r"full"}
+
+
+_ISO = re.compile(r"\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2}):(\d{2})")
+
+
+def _row_times(row: dict) -> list[str]:
+    return [str(v) for k, v in row.items() if k != "ref" and _ISO.fullmatch(str(v).rstrip("Z"))]
+
+
+def _first_time(row: dict) -> str | None:
+    """The moment a row records: a log's ts, an event's time, else when the row was created."""
+    for k in ("ts", "at", "event_at", "occurred_at", "created_at"):
+        if row.get(k) and _ISO.match(str(row[k])):
+            return str(row[k])
+    t = _row_times(row)
+    return t[0] if t else None
+
+
+def _secs(iso: str) -> float:
+    import datetime as dt
+    return dt.datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp()
+
+
+def _time_claims(low: str, refs: list[str], ref_rows: dict) -> tuple[list[str], list[str]]:
+    """Times of day, the order of two cited events, and 'seconds' vs 'minutes' between them."""
+    facts, missing = [], []
+    rows = [ref_rows[r] for r in refs if r in ref_rows]
+    stamps = [t for r in rows for t in _row_times(r)]
+    for hh, mm, ss in re.findall(r"(?<![\d:])(\d{1,2}):(\d{2})(?::(\d{2}))?(?![\d:])", low):
+        want = f"T{int(hh):02d}:{mm}" + (f":{ss}" if ss else "")
+        facts.append(want[1:])
+        if not any(want in t for t in stamps):
+            missing.append(want[1:])
+    timed = [(r, _first_time(ref_rows[r])) for r in refs if r in ref_rows and _first_time(ref_rows[r])]
+    if len(timed) == 2:
+        # which event does the sentence name first? Find each row's own words (route, mail event, table) in the text.
+        def where(ref):
+            words = {"payments": ["payment", "paid", "결제"], "orders": ["order", "주문"], "grants": ["grant", "credit", "지급", "적립"],
+                     "mail_events": ["mail", "email", "메일"], "server_logs": []}[ref.split(":", 1)[0]]
+            if ref.startswith("server_logs:"):
+                route = ref.rsplit("@", 1)[-1]
+                words = [w for w in re.split(r"[/_]", route) if w and w not in ("api", "admin", "payments")] or [route]
+            if ref.startswith("mail_events:"):
+                ev = ref.rsplit("@", 1)[-1]
+                words = {"sent": ["sent", "send"], "bounced": ["bounc", "반송"], "delivered": ["deliver", "도착"]}.get(ev, [ev]) + words
+            if ref.startswith("grants:") and "retry" in ref:
+                words = ["retry", "재지급"] + words
+            hits = [low.find(w) for w in words if low.find(w) >= 0]
+            return min(hits) if hits else None
+        pos = [where(r) for r, _ in timed]
+        if None in pos or pos[0] == pos[1]:
+            timed = []  # can't tell which event the sentence puts first: only times of day are checked
+        else:
+            timed = [x for _, x in sorted(zip(pos, timed))]
+    if len(timed) == 2:
+        (_, a), (_, b) = timed
+        d = _secs(b) - _secs(a)  # the event named second minus the event named first
+        claim = None
+        if re.search(r"\bsame (?:second|moment|time)\b|동시에|같은 시각", low):
+            claim = ("same time", abs(d) < 1)
+        elif re.search(r"\b(?:before|earlier than|prior to|ahead of)\b|보다 먼저|이전에|앞서", low):
+            claim = ("before", d > 0)
+        elif re.search(r"\b(?:after|later than|following)\b|보다 늦게|이후에|뒤에", low):
+            claim = ("after", d < 0)
+        if claim:
+            facts.append(claim[0])
+            if not claim[1]:
+                missing.append(f"{claim[0]} (cited times say otherwise)")
+        if re.search(r"\b(?:\w+ )?minutes?\b|분 (?:뒤|후|만에)", low) and abs(d) < 60:
+            facts.append("minutes"); missing.append("minutes (the cited rows are seconds apart)")
+        if re.search(r"\bseconds?\b|초 (?:뒤|후|만에)", low) and abs(d) >= 120:
+            facts.append("seconds"); missing.append("seconds (the cited rows are minutes apart)")
+    return facts, missing
 
 
 def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
@@ -192,6 +266,21 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
         num_facts = [re.sub(r"[, ]", "", n) for n in _FACT_NUM.findall(body_noids)]
         facts = num_facts + _FACT_DOMAIN.findall(body)
         missing = [n for n in num_facts if n not in nums] + [d for d in _FACT_DOMAIN.findall(body) if d.lower() not in hay]
+        tf, tm = _time_claims(low, refs, ref_rows)
+        facts += tf; missing += tm
+        # API paths and bare domains named in the sentence must be in the cited rows
+        for path in re.findall(r"/api/[\w/.-]+", low):
+            facts.append(path)
+            if path.rstrip(".,") not in hay:
+                missing.append(path)
+        for dom in re.findall(r"(?<![@\w.])([a-z0-9-]+\.(?:com|net|org|io|kr|co\.kr))\b", low):
+            facts.append(dom)
+            if dom not in hay:
+                missing.append(dom)
+        if re.search(r"\b(?:only|just)?\s*(?:a single|one) grant\b|(?:지급|적립)[은이]?\s*한 (?:번|건)", low):
+            facts.append("one grant")
+            if sum(1 for r in cited_all if r.startswith("grants:")) != 1:
+                missing.append("one grant")
         # dates written in Korean ("10월 14일") must be the date of a cited row
         for mo, dy in re.findall(r"(\d{1,2})월\s*(\d{1,2})일", body):
             stamp = f"-{int(mo):02d}-{int(dy):02d}"
@@ -256,6 +345,8 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
             if not any(str(r.get("credits", "")) == n for r in rows):
                 missing.append(f"{n} credits")
         hit = {name for name, pat, _ in _STATES if re.search(pat, low)}
+        if re.search(r"\b(?:not|wasn't|was not|isn't|no)\s+(?:an?\s+)?[\w-]*\s*(?:failure|error)\b|실패가 아니", low):
+            hit.discard("fail")  # "it was not a mail-queue failure" claims no failure
         # "N times" about grants must match the number of grant rows cited in the explanation
         for a, b in _TIMES.findall(low):
             tok = (a or b).lower()
