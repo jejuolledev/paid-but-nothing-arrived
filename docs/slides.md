@@ -46,10 +46,10 @@ Green until the link that broke. Click the link → the raw row that proves it. 
 # Agent workflow
 
 1. locate the order (email / order id)
-2. `order_journey` — read-only SQL to Zetaris across the five tables of one semantic layer
+2. `order_journey` — one read-only SQL statement to Zetaris, joining five tables across three datasources
 3. deterministic verifier: each link green / red / grey, with refs
 4. Nemotron (via Nightshift) explains and drafts the reply; the fix comes from the verifier
-5. citation check: the explanation must cite returned `ref`s and may cite nothing else, or it is replaced by the verifier's text
+5. citation + claim check: the explanation may cite only returned `ref`s, and every amount and address in each sentence must be in the rows it cites — or it is replaced by the verifier's text
 
 ---
 
@@ -61,9 +61,17 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # How Zetaris was used
 
-- Five synthetic tables in one Postgres datasource (`demo_pg`), activated into the semantic layer `order_journey`, related on `order_id` / `payment_id` / `email`.
+- Three datasources: shop app DB (`demo_pg`), payment-provider ledger (`psp_pg`), mail-provider events (`mail_pg`), joined in the semantic layer `order_journey`; the agent reads an order's whole history with one query, and the page shows it.
 - The agent sends SQL only. Nothing is copied. Every row carries `table:key`.
 - Same SQL on DuckDB for tests; backend name printed on every result.
+
+---
+
+# Zetaris: the same query, in Zetaris
+
+![w:900](demo/zetaris_ui/30_journey_query_in_zetaris.png)
+
+The agent's journey query run in Zetaris's SQL Workspace: order saved under `exmaple.com`, payer `example.com`, mail sent then bounced — three datasources, one statement.
 
 ---
 

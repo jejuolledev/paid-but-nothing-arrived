@@ -1,7 +1,17 @@
 # Sponsor technologies — how each one is used
 
 ## How Zetaris was integrated
-Zetaris is the only thing the agent queries. The four systems a seller would otherwise open by hand — the payment-provider ledger, the orders and credit-grants database, the server-log export and the mail-provider events — are stood in for by five synthetic tables (payments, orders, grants, server_logs, mail_events). They sit in one Postgres database registered as a Zetaris datasource (`demo_pg`, local Zetaris platform, Lightning JDBC), and each table is activated into one unified semantic layer, `order_journey` (`zetaris/register.sql`). In production each system would be its own datasource behind the same layer. The agent's tools send SQL only; nothing is copied out of the source systems, and every returned row carries `table:key` so any conclusion can cite it.
+Zetaris is the only thing the agent queries. The four systems a seller would otherwise open by hand — the payment-provider ledger, the orders and credit-grants database, the server-log export and the mail-provider events — are stood in for by three separate synthetic databases, each registered in Zetaris as its own datasource (local Zetaris platform, Lightning JDBC; `zetaris/register.sql`):
+
+| Zetaris datasource | stands in for | tables |
+|---|---|---|
+| `demo_pg` | the shop's app database | orders, grants, server_logs |
+| `psp_pg` | the payment provider's ledger | payments |
+| `mail_pg` | the mail provider's events | mail_events |
+
+All five tables are activated into one unified semantic layer, `order_journey`. For an order's full history the agent sends **one SQL statement** that joins the five tables across the three datasources (`agent/tools.py`, `order_journey`); Zetaris federates it, nothing is copied out of the sources, and the joined rows are split back into per-source rows so each one keeps its `table:key` ref. The page shows that statement above the evidence rows, and the SQL behind every step of the investigation (`docs/demo/zetaris_ui/30_journey_query_in_zetaris.png` is the same query run in Zetaris's SQL Workspace; `31_three_datasources.png` is `SHOW DATASOURCES`).
+
+- Measured on the local platform: the journey query takes about 6–9 s warm (Docker on an Apple-silicon laptop).
 
 - Read-only by design. When the seller approves a fix, Zetaris is not written to: the fix belongs to the seller's own systems. In the offline demo (DuckDB over the same synthetic CSVs, same table names, same SQL) the fix is applied so the chain can be seen turning green; on Zetaris the approve endpoint answers "read-only" instead of pretending.
 

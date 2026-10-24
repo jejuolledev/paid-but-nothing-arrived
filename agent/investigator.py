@@ -51,10 +51,18 @@ def _client():
     # Customer rows stay on this machine unless the operator explicitly opts in to a remote model.
     if not re.match(r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(/|$)", base) and os.getenv("ALLOW_CLOUD_LLM") != "1":
         return None, None
+    # nothing listening there (e.g. Nightshift not started): answer at once with the verifier instead of waiting on retries
+    import socket
+    from urllib.parse import urlparse
+    u = urlparse(base)
+    try:
+        socket.create_connection((u.hostname, u.port or (443 if u.scheme == "https" else 80)), timeout=1).close()
+    except OSError:
+        return None, "unreachable"
     from openai import OpenAI
     # Nightshift keeps a policy per calling app; this name is the row the operator sees and binds.
     headers = {"meterless-app": "paid-but-nothing-arrived"} if os.getenv("NIGHTSHIFT_BASE_URL") else None
-    return OpenAI(base_url=base, api_key=key or "local", default_headers=headers, timeout=180, max_retries=0), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
+    return OpenAI(base_url=base, api_key=key or "local", default_headers=headers, timeout=180), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
 
 
 REF_RE = re.compile(r"(?:payments|orders|grants|server_logs|mail_events):[A-Za-z0-9_./@:+-]+")
@@ -85,6 +93,28 @@ def _citations_ok(text: str, refs: set[str]) -> tuple[bool, list[str]]:
     cited = [c.rstrip(".,;)") for c in REF_RE.findall(text)]
     bad = [c for c in cited if c not in refs]
     return (len(cited) > 0 and not bad), bad
+
+
+_FACT_NUM = re.compile(r"\b\d[\d,]{2,}\b")            # amounts, codes, years: 3+ digits
+_FACT_DOMAIN = re.compile(r"@([\w-]+(?:\.[\w-]+)+)")    # the domain of an address (masked or not)
+
+
+def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
+    """Sentence by sentence: every number (3+ digits) and every e-mail domain a sentence states must appear in
+    a row that the same sentence cites (or, if it cites nothing, in a row cited elsewhere in the explanation).
+    Catches an explanation that cites a real row but says something the row does not show."""
+    cited_all = [c.rstrip(".,;)") for c in REF_RE.findall(text)]
+    report, ok = [], True
+    for sent in [x.strip() for x in re.split(r"(?<=[.!?])\s+|\n+", text) if x.strip()]:
+        refs = [c.rstrip(".,;)") for c in REF_RE.findall(sent)] or cited_all
+        body = REF_RE.sub("", sent)
+        facts = [n.replace(",", "") for n in _FACT_NUM.findall(body)] + _FACT_DOMAIN.findall(body)
+        hay = " ".join(str(v) for r in refs for v in ref_rows.get(r, {}).values()).lower()
+        missing = [f for f in facts if f.lower() not in hay]
+        if missing:
+            ok = False
+        report.append({"sentence": sent, "refs": refs, "facts": facts, "unsupported": missing})
+    return ok, report
 
 
 def _order_belongs(tools, order_id: str, email: str) -> bool:
@@ -123,6 +153,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
         mark("sender_scope", f"{ignored_order} is not this sender's order — ignored")
     sender_unverified = bool(order_id and not email)
     client, model = _client() if use_model else (None, None)
+    unreachable = client is None and model == "unreachable"
     steps, loop_finding = [], ""
     target = None
     # 1a. with a model: the model decides which records to pull (tools are read-only and scoped to the
@@ -166,7 +197,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
     refs = {r["ref"] for rows in journey.values() for r in rows}
 
     # 4. explanation + reply + fix (LLM, citation-checked)
-    texts, llm_used, citation = None, ("none" if use_model else "verifier-only"), {"checked": False}
+    texts, llm_used, citation = None, ("verifier-only" if not use_model else "unreachable" if unreachable else "none"), {"checked": False}
     receipts = [st.get("receipt") for st in steps]
     if client:
         try:
@@ -192,7 +223,12 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             from .agent_loop import meterless_receipt
             receipts.append(meterless_receipt(resp))
             texts["_raw_explanation"] = texts.get("explanation", "")
-            ok, bad = _citations_ok(texts.get("explanation", ""), refs); citation = {"checked": True, "ok": ok, "unknown_refs": bad}
+            ok, bad = _citations_ok(texts.get("explanation", ""), refs)
+            ref_rows = {r["ref"]: r for rows in journey.values() for r in rows}
+            claims_ok, claims = _claims_ok(texts.get("explanation", ""), ref_rows)
+            citation = {"checked": True, "ok": ok and claims_ok, "unknown_refs": bad, "claims": claims,
+                        "claims_ok": claims_ok}
+            ok = ok and claims_ok
             texts["fix_action"] = verdict.suggested_fix  # the fix is decided by the verifier, never by the model
             if not _reply_ok(texts.get("customer_reply", ""), verdict):
                 texts["customer_reply"] = _template_reply(verdict, lang); citation["reply_replaced"] = True
@@ -216,7 +252,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             "chain": [{"name": l.name, "label": LABELS[l.name], "state": l.state, "note": l.note, "refs": l.refs} for l in verdict.links],
             "broken": verdict.broken, "verified": verdict.verified, "unverified": verdict.unverified,
             "explanation": texts["explanation"], "customer_reply": texts["customer_reply"], "fix_action": texts["fix_action"],
-            "rows": journey, "trace": [asdict(t) for t in trace], "steps": steps, "receipts": [r for r in receipts if r], "llm": llm_used, "citation_check": citation, "backend": db.name,
+            "rows": journey, "trace": [asdict(t) for t in trace], "steps": steps, "queries": tools.sql_log, "receipts": [r for r in receipts if r], "llm": llm_used, "citation_check": citation, "backend": db.name,
             "lang": lang, "elapsed_ms": int((time.time() - t0) * 1000)}
 
 

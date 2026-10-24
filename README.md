@@ -30,7 +30,7 @@ Without a model connected, explanations and replies come from the verifier's tem
 ## What it is
 Every online seller gets this message: **"I paid, but nothing arrived."** If the answer is slow, the next step is a card dispute ("product not received"). Today the seller opens four screens — the payment provider, the orders database, the server logs, the mail provider — and lines them up by hand.
 
-This agent does that in one pass. It asks **one SQL door (Zetaris)** — in this demo, five synthetic tables standing in for those four systems, registered in Zetaris and joined in one semantic layer — walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. **NVIDIA Nemotron 3.5 Lightning**, called through **Meterless Nightshift** on the seller's Mac, decides which records to pull and writes the explanation and the customer reply. The explanation must cite the rows the tools returned (a citation check replaces it otherwise); the verdict and the fix come from a deterministic verifier, never from the model.
+This agent does that in one pass. It asks **one SQL door (Zetaris)** — in this demo, three separate synthetic databases (shop app DB, payment-provider ledger, mail-provider events) registered in Zetaris as three datasources and joined in one semantic layer, read with **one SQL statement per order** — walks the **money chain** — *card authorized → PSP paid → order confirmed → credits granted → mail delivered* — and marks the one link that broke, **with the raw rows that prove it**. **NVIDIA Nemotron 3.5 Lightning**, called through **Meterless Nightshift** on the seller's Mac, decides which records to pull and writes the explanation and the customer reply. The explanation must cite the rows the tools returned (a citation check replaces it otherwise); the verdict and the fix come from a deterministic verifier, never from the model.
 
 It also knows how to say *nothing is broken*: when there is no charge at the PSP, the chain stops grey and the answer is "You were never charged."
 
@@ -49,7 +49,7 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
 - `agent/agent_loop.py` — the investigation loop: Nemotron picks the next tool; the tools only follow the sender's own trail.
 - `agent/actions.py` — human-approved fixes with an audit log (offline demo; Zetaris stays read-only).
 - `agent/chain.py` — the verifier. Green / red / grey per link, each with the refs that decided it. The model never overrides it.
-- `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check.
+- `agent/investigator.py` — the loop, the model call (OpenAI-compatible: Nightshift → Nemotron), the citation check and the per-sentence claim check (every amount and address a sentence states must be in the rows it cites).
 - `app/` — FastAPI + a single page: the chain, "why" with clickable citations, verified / not verified, reply draft, fix (needs approval), dispute evidence bundle.
 
 ## Requirements
@@ -63,7 +63,7 @@ Quick try: see *Try it yourself* at the top (DuckDB over the same synthetic CSVs
 
 **Full run — Zetaris + Meterless Nightshift + NVIDIA Nemotron** (what the demo video shows): `cp .env.example .env.local` and fill the values below, then start the app the same way. If Nightshift is not running, the page says "no model reachable" and falls back to the verifier's text.
 
-Zetaris: `zetaris/register.sql` registers the synthetic Postgres database as a datasource and activates its five tables into the `order_journey` semantic layer. Nightshift: turn the hotspot on, copy the local address and key into `.env.local` (`NIGHTSHIFT_BASE_URL`, `NIGHTSHIFT_API_KEY`).
+Zetaris: `zetaris/load_postgres.sh` loads the CSVs into three databases and `zetaris/register.sql` registers them as three datasources (`demo_pg`, `psp_pg`, `mail_pg`) and activates their five tables into the `order_journey` semantic layer. Nightshift: turn the hotspot on, copy the local address and key into `.env.local` (`NIGHTSHIFT_BASE_URL`, `NIGHTSHIFT_API_KEY`).
 
 ## Usage
 Paste a customer message (or click a seeded case). The result page shows the chain, the broken link, the cited rows, what was verified and what was not, a reply draft, a fix that requires your approval, and a dispute evidence bundle (`/api/evidence`). The JSON API is `POST /api/investigate {"message": "..."}`.
@@ -79,7 +79,7 @@ Paste a customer message (or click a seeded case). The result page shows the cha
 
 ## Sponsor technologies
 See `docs/sponsor-tech.md` for the full write-up.
-- **Zetaris** — the one SQL door. In the demo the five tables (payments, orders, grants, server logs, mail events) live in one Postgres datasource and are activated into the unified semantic layer `order_journey`; the agent only ever sends SQL to Zetaris. In production each system would be its own datasource behind the same layer.
+- **Zetaris** — the one SQL door. Three datasources (shop app DB, payment-provider ledger, mail-provider events) are joined in the unified semantic layer `order_journey`; for an order's history the agent sends one SQL statement that Zetaris federates across all three. The page shows that statement and the SQL behind every investigation step ([the same query in Zetaris's SQL Workspace](docs/demo/zetaris_ui/30_journey_query_in_zetaris.png), [the three datasources](docs/demo/zetaris_ui/31_three_datasources.png)).
 - **Meterless Nightshift** — the model gateway on the seller's Mac: the app calls only Nightshift, Nightshift seats the NVIDIA Nemotron lane, and every answer comes with a compute receipt that the app shows on screen. The agent refuses model endpoints that are not on this machine unless `ALLOW_CLOUD_LLM=1`; where Nightshift may send a call (local only, or a cloud lane such as NVIDIA's hosted endpoint) is the seller's setting in Nightshift. Before any row leaves the app, the sender's address becomes `CUSTOMER`, other addresses keep only a first letter and domain, and card digits are removed before rows reach the model.
 - **NVIDIA Nemotron 3.5 Lightning** — investigates (chooses the next read-only lookup) and explains. In the demo it runs on NVIDIA's hosted endpoint through Nightshift; the same open weights (OpenMDW-1.1) also run on the Mac.
 - **Cursor** — development; see `docs/sponsor-tech.md`.

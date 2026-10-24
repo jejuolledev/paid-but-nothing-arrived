@@ -24,9 +24,13 @@ await waitResult(); mark('result6');
 await p.waitForTimeout(2500);
 // timeline into view
 const tl = await p.$('text=/How the agent found it|에이전트가 찾은 과정/'); if (tl) { await tl.scrollIntoViewIfNeeded(); await p.waitForTimeout(3500); mark('timeline'); }
+// the SQL behind a step: open the first 'SQL sent' under the timeline
+const sq = await p.$('details.sql summary'); if (sq) { await sq.scrollIntoViewIfNeeded(); await sq.click(); await p.waitForTimeout(3500); mark('sql_step'); }
+// the per-sentence check under Why
+const why = await p.$('ul.claims'); if (why) { await why.scrollIntoViewIfNeeded(); await p.waitForTimeout(3500); mark('claims'); }
 // N05 — chain + citation flash
 await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' })); await p.waitForTimeout(1500); mark('chain');
-const cite = await p.$('a[href^="#row-"]'); if (cite) { await cite.click(); await p.waitForTimeout(3000); mark('citation'); }
+const cite = await p.$('a[href^="#row-"]'); if (cite) { await cite.click(); await p.waitForTimeout(1200); mark('citation'); const box = await p.$('pre.sqlbox'); if (box) { await box.scrollIntoViewIfNeeded(); await p.waitForTimeout(3500); mark('journey_sql'); } }
 await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' })); await p.waitForTimeout(1500);
 // N06 — reply + Korean toggle briefly
 const ko = await p.$('text=한국어'); if (ko) { await ko.click(); await p.waitForTimeout(3000); mark('korean'); const en = await p.$('text=EN'); if (en) await en.click(); await p.waitForTimeout(1500); }

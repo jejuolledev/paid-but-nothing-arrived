@@ -24,7 +24,7 @@ button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,79,.5)}50%{box-shadow:0 0 0 8px rgba(255,77,79,0)}}
 @keyframes flashRow{0%,100%{background:transparent}20%,80%{background:rgba(91,141,239,.35)}}
 .flash{animation:flashRow 1.5s ease}
-h2{font-size:18px;margin:0 0 6px}.headline{font-size:22px;font-weight:600}.warnline{margin-top:6px;font-size:13px;color:#f3c969;background:rgba(243,201,105,.08);border:1px solid rgba(243,201,105,.35);border-radius:6px;padding:4px 8px}.mut{color:var(--mut)}
+h2{font-size:18px;margin:0 0 6px}.headline{font-size:22px;font-weight:600}.sql summary{cursor:pointer;color:var(--acc);font-size:12px;margin-top:4px}.sql pre,.sqlbox{white-space:pre-wrap;font:12px/1.45 ui-monospace,Menlo,monospace;background:#0b0e13;border:1px solid var(--line,#2a303b);border-radius:8px;padding:8px 10px;margin:6px 0;color:#cfd6e2}.claims{margin:0;padding-left:0;list-style:none}.claims li{margin:4px 0}.ok-mark{color:var(--green,#3fb97d);font-weight:700}.warnline{margin-top:6px;font-size:13px;color:#f3c969;background:rgba(243,201,105,.08);border:1px solid rgba(243,201,105,.35);border-radius:6px;padding:4px 8px}.mut{color:var(--mut)}
 pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;margin:0}
 .prose{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;margin:0;font:inherit;line-height:1.5}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:720px){.two{grid-template-columns:1fr}}
@@ -127,10 +127,15 @@ const I18N={
     unverified:'Not verified',
     evidence:'Evidence: raw rows',
     trace:'Trace',
-    citationOk:'Citation check: passed',
+    citationOk:'Citation check: passed — every cited row was returned by the query, and every amount and address in each sentence was found in the rows it cites',
+    checkedFacts:f=>'found in the cited rows: '+f.join(', '),
     citationFail:'Citation check: failed → verifier text used',
     citationSkip:'Citation check: model step skipped (no model reachable)',
     resetDemo:'Reset the demo data (puts the bugs back so you can try again)',
+    sqlSent:'SQL sent',
+    allSql:src=>`Every statement sent through the SQL door (${src}), in order:`,
+    refused:'refused (not this sender\'s record)',
+    oneQuery:(src,n)=>`Every row below came from this one query — ${src} — ${n} joined row(s), split back into the five sources:`,
     knownPattern:'This root cause is the known pattern for this kind of break (from our incident notes); the cited rows show the symptoms.',
     resetDone:'Demo data reset. Click a case to start again.',
     evidenceBtn:'Dispute evidence bundle',
@@ -191,10 +196,15 @@ const I18N={
     unverified:'확인되지 않음',
     evidence:'근거: 원본 행',
     trace:'추적',
-    citationOk:'인용 검사: 통과',
+    citationOk:'인용 검사: 통과 — 인용한 행은 모두 쿼리가 돌려준 행이고, 문장마다 적힌 금액·주소가 그 문장이 인용한 행에 실제로 있음',
+    checkedFacts:f=>'인용한 행에서 확인: '+f.join(', '),
     citationFail:'인용 검사: 실패 → 검증기 문구 사용',
     citationSkip:'인용 검사: 모델 단계 생략(연결된 모델 없음)',
     resetDemo:'데모 데이터 되돌리기(오류를 다시 넣어 처음부터 해 볼 수 있음)',
+    sqlSent:'보낸 SQL',
+    allSql:src=>`SQL 창구로 보낸 모든 문장(${src}), 순서대로:`,
+    refused:'거부됨(이 고객의 기록이 아님)',
+    oneQuery:(src,n)=>`아래 행은 모두 이 쿼리 하나로 가져왔습니다 — ${src} — 합쳐진 ${n}행을 다섯 출처로 다시 나눔:`,
     knownPattern:'이 원인 설명은 이런 끊김의 알려진 유형(저희 사고 기록)입니다. 근거 행은 그 증상을 보여 줍니다.',
     resetDone:'데모 데이터를 되돌렸습니다. 사례를 눌러 다시 시작하세요.',
     evidenceBtn:'분쟁용 근거 묶음',
@@ -420,6 +430,21 @@ function renderChain(chain, clickable){
   }).join('');
 }
 
+function prettySql(q){
+  // the one journey query lists ~30 aliased columns; show the shape, keep FROM/JOIN/WHERE verbatim
+  let x=String(q).replace(/^SELECT\s+o\.order_id AS o__order_id.*?\s+FROM /s,'SELECT o.*, p.*, g.*, l.*, m.*  -- (aliased column list shortened)\nFROM ');
+  return x.replace(/\s+(LEFT JOIN|WHERE|ORDER BY|LIMIT)\s+/g,'\n$1 ');
+}
+function sqlSource(r){return /zetaris/i.test(String(r.backend||''))?'Zetaris · lightning.metastore.demo.order_journey':'DuckDB over the synthetic CSVs (same SQL as Zetaris)';}
+
+function renderWhy(r){
+  const i=t(), c=r.citation_check||{};
+  // model explanation that passed: one line per sentence with what was checked against the cited rows
+  if(c.checked&&c.ok&&Array.isArray(c.claims)&&c.claims.length)
+    return `<ul class="claims">${c.claims.map(x=>`<li><span class="ok-mark">✓</span> ${linkifyExplain(x.sentence)}${x.facts&&x.facts.length?` <span class="mut" style="font-size:12px">(${esc(i.checkedFacts(x.facts))})</span>`:''}</li>`).join('')}</ul>`;
+  return `<p>${linkifyExplain(r.explanation)}</p>`;
+}
+
 function renderSteps(steps){
   const i=t();
   if(!Array.isArray(steps)||!steps.length)return'';
@@ -427,7 +452,8 @@ function renderSteps(steps){
     const bits=[`<div>${esc(s.thought||'')}</div>`];
     if(s.tool){
       const args=s.args!=null?(typeof s.args==='string'?s.args:JSON.stringify(s.args)):'';
-      bits.push(`<div class="tool">${esc(trTool(s.tool))}${args?` ${esc(args)}`:''}${s.rows!=null?` · ${esc(rowsLabel(s.rows))}`:''}${s.error?' · error':''}</div>`);
+      bits.push(`<div class="tool">${esc(trTool(s.tool))}${args?` ${esc(args)}`:''}${s.rows!=null?` · ${esc(rowsLabel(s.rows))}`:''}${s.refused?` · ${esc(i.refused)}`:(s.error?' · error':'')}</div>`);
+      if(Array.isArray(s.sql)&&s.sql.length)bits.push(`<details class="sql"><summary>${esc(i.sqlSent)}</summary><pre>${esc(s.sql.map(prettySql).join('\n\n'))}</pre></details>`);
     }
     if(s.receipt){
       const m=s.receipt.model||s.receipt.provider_model||s.receipt.requested_model||'';
@@ -488,12 +514,12 @@ function render(r, opts){
       <p id="approve-msg" class="hint" style="margin:8px 0 0" hidden></p></div>
   </div>
   ${renderSteps(r.steps)}
-  <div class="card"><h2>${esc(i.why)}</h2><p>${linkifyExplain(r.explanation)}</p>${(!r.citation_check||!r.citation_check.checked||r.citation_check.replaced_with_verifier_text)?`<p class="hint">${esc(i.knownPattern)}</p>`:''}
+  <div class="card"><h2>${esc(i.why)}</h2>${renderWhy(r)}${(!r.citation_check||!r.citation_check.checked||r.citation_check.replaced_with_verifier_text)?`<p class="hint">${esc(i.knownPattern)}</p>`:''}
     <p class="mut" style="font-size:12px">${esc(citeNote)}</p></div>
   <div class="card two"><div><h2>${esc(i.verified)}</h2><ul>${r.verified.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></div>
     <div><h2>${esc(i.unverified)}</h2><ul>${r.unverified.map(v=>`<li>${esc(v)}</li>`).join('')||`<li class="mut">—</li>`}</ul></div></div>
-  <details class="card rows" id="evidence"><summary>${esc(i.evidence)}</summary>${rows}</details>
-  <details class="card" id="trace"><summary>${esc(i.trace)}</summary><ul>${(r.trace||[]).map(tr=>`<li><b>${esc(tr.step)}</b> — ${esc(tr.detail)} <span class="mut">${esc(tr.ms)} ${esc(i.ms)}</span></li>`).join('')}</ul></details>`;
+  <details class="card rows" id="evidence"><summary>${esc(i.evidence)}</summary>${(()=>{const q=(r.queries||[]).filter(x=>x.tool==='order_journey').pop();return q?`<p class="hint">${esc(i.oneQuery(sqlSource(r),q.rows))}</p><pre class="sqlbox">${esc(prettySql(q.sql))}</pre>`:'';})()}${rows}</details>
+  <details class="card" id="trace"><summary>${esc(i.trace)}</summary><ul>${(r.trace||[]).map(tr=>`<li><b>${esc(tr.step)}</b> — ${esc(tr.detail)} <span class="mut">${esc(tr.ms)} ${esc(i.ms)}</span></li>`).join('')}</ul>${(r.queries||[]).length?`<p class="hint">${esc(i.allSql(sqlSource(r)))}</p><pre class="sqlbox">${esc(r.queries.map(q=>`-- ${q.tool} · ${q.rows} row(s)\n`+prettySql(q.sql)).join('\n\n'))}</pre>`:''}</details>`;
 
   const copyBtn=$('#copy-reply');
   if(copyBtn)copyBtn.onclick=async()=>{

@@ -1,5 +1,5 @@
 -- Zetaris Lightning SQL — run ONE statement per call (JDBC) or paste into the SQL editor.
--- Registers the five synthetic sources and builds the `order_journey` unified semantic layer.
+-- Registers three datasources (shop app DB, payment-provider ledger, mail-provider events) and builds the `order_journey` unified semantic layer over their five tables.
 -- Syntax per https://zetaris.github.io/getting-started/docs/guides/zetaris-lightning-sql-commands.html
 --
 -- Source layout for the local Docker platform: the synthetic CSVs are loaded into a `demo`
@@ -17,6 +17,27 @@ CREATE DATASOURCE demo_pg DESCRIBE BY "synthetic_seller_sources" OPTIONS (
 );
 
 REGISTER DATASOURCE TABLES FROM demo_pg;
+
+-- the payment provider's ledger and the mail provider's events are separate systems: separate datasources
+CREATE DATASOURCE psp_pg DESCRIBE BY "payment_provider_ledger" OPTIONS (
+  jdbcdriver "org.postgresql.Driver",
+  jdbcurl "jdbc:postgresql://postgres:5432/psp",
+  username "zetaris",
+  password "${POSTGRES_PASSWORD}",
+  fetchsize "1000"
+);
+
+REGISTER DATASOURCE TABLES FROM psp_pg;
+
+CREATE DATASOURCE mail_pg DESCRIBE BY "mail_provider_events" OPTIONS (
+  jdbcdriver "org.postgresql.Driver",
+  jdbcurl "jdbc:postgresql://postgres:5432/mailprov",
+  username "zetaris",
+  password "${POSTGRES_PASSWORD}",
+  fetchsize "1000"
+);
+
+REGISTER DATASOURCE TABLES FROM mail_pg;
 
 -- 2. namespace + semantic layer (send the whole COMPILE statement in one piece)
 CREATE NAMESPACE IF NOT EXISTS lightning.metastore.demo;
@@ -68,12 +89,12 @@ CREATE TABLE mail_events (
 
 -- 3. activate each table from the registered source
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.orders AS SELECT COALESCE(order_id,'') AS order_id, payment_id, email, reward_key, amount, status, credited, created_at, updated_at FROM demo_pg.orders;
-ACTIVATE USL TABLE lightning.metastore.demo.order_journey.payments AS SELECT COALESCE(payment_id,'') AS payment_id, amount, currency, status, card_last4, customer_email, created_at FROM demo_pg.payments;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.payments AS SELECT COALESCE(payment_id,'') AS payment_id, amount, currency, status, card_last4, customer_email, created_at FROM psp_pg.payments;
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.grants AS SELECT COALESCE(grant_id,'') AS grant_id, email, reward_key, credits, status, order_id, created_at FROM demo_pg.grants;
 ACTIVATE USL TABLE lightning.metastore.demo.order_journey.server_logs AS SELECT COALESCE(ts,'') AS ts, route, order_id, http_status, message FROM demo_pg.server_logs;
-ACTIVATE USL TABLE lightning.metastore.demo.order_journey.mail_events AS SELECT COALESCE(email_id,'') AS email_id, to_address, event, ts, order_tag FROM demo_pg.mail_events;
+ACTIVATE USL TABLE lightning.metastore.demo.order_journey.mail_events AS SELECT COALESCE(email_id,'') AS email_id, to_address, event, ts, order_tag FROM mail_pg.mail_events;
 
--- 4. smoke test — the join the agent relies on. The agent sets ZETARIS_SCHEMA=lightning.metastore.demo.order_journey
+-- 4. smoke test — the one query the agent sends for an order's journey (three datasources, one join). The agent sets ZETARIS_SCHEMA=lightning.metastore.demo.order_journey
 SELECT o.order_id, o.status, p.status AS psp_status, g.grant_id
 FROM lightning.metastore.demo.order_journey.orders o
 LEFT JOIN lightning.metastore.demo.order_journey.payments p ON p.payment_id = o.payment_id

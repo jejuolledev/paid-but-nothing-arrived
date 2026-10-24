@@ -191,7 +191,9 @@ def test_reply_language_follows_the_page_and_reset_restores_the_bug(monkeypatch)
     from agent import sql_backend
     old = DuckDBBackend()
     monkeypatch.setitem(sql_backend._CACHE, "backend", old)
-    from app.main import api_reset
+    from app.main import api_reset  # importing the app loads .env.local; keep this test on the CSVs
+    for k in ("ZETARIS_JDBC_URL", "ZETARIS_JDBC_JAR", "ZETARIS_SQL_URL", "ZETARIS_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
     assert api_reset().status_code == 200 and sql_backend._CACHE["backend"] is not old  # fresh data, bugs back
 
 
@@ -200,3 +202,13 @@ def test_reply_with_masked_placeholders_is_replaced():
     from agent.investigator import _reply_ok
     v = SimpleNamespace(broken="account_mismatch", headline="Paid, but the credits went to a different account.")
     assert not _reply_ok("The credits went to l***@exmaple.com. Could you confirm this is the email address you used for the payment?", v)
+
+
+def test_claim_check_catches_a_cited_but_false_sentence():
+    from agent.investigator import _claims_ok
+    rows = {"payments:pay_0906": {"payment_id": "pay_0906", "amount": "24900", "customer_email": "liam.patel906@example.com"},
+            "orders:ord_0906": {"order_id": "ord_0906", "email": "liam.patel906@exmaple.com"}}
+    ok, _ = _claims_ok("The customer paid 24,900 KRW [payments:pay_0906]. The order used l***@exmaple.com [orders:ord_0906].", rows)
+    assert ok
+    ok, rep = _claims_ok("The customer paid 49,900 KRW [payments:pay_0906].", rows)
+    assert not ok and rep[0]["unsupported"] == ["49900"]

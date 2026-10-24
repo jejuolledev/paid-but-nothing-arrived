@@ -56,37 +56,44 @@ def clip(video, a, b, secs, out, crop=None):
     run(["-ss", str(a), "-t", str(b - a), "-i", str(video), "-vf", vf, "-t", f"{secs:.3f}", *ENC, str(out)])
 
 
-LINES = ["N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08", "N08b", "N09", "N10", "N11"]
+LINES = ["N01", "N02", "N03", "N04", "N05", "N05b", "N06", "N07", "N08", "N08b", "N09", "N10", "N11"]
 vo = {k: D / "vo" / f"{k}.wav" for k in LINES}
 L = {k: dur(p) for k, p in vo.items()}
 slot = {k: L[k] + GAP for k in L}
 slot["N11"] += 1.5  # title card holds a moment after the last line
 
-f_live_result = frame(LIVE, 217.7, TMP / "live_result.png")       # chain + reply + fix + timeline on screen
-f_live_rows = frame(LIVE, 224.9, TMP / "live_rows.png")
-f_case5 = frame(LIVE, 412.5, TMP / "case5.png")                    # never charged + the ignored foreign order           # evidence rows, cited row highlighted
-CHAIN, REPLYFIX, TIMELINE, ROWS = (240, 0, 960, 540), (240, 250, 960, 540), (240, 360, 960, 540), (240, 360, 960, 540)
+f_live_result = frame(LIVE, 91.5, TMP / "live_result.png")        # chain + reply + fix on screen
+f_live_sql = frame(LIVE, 98.8, TMP / "live_sql.png")              # a timeline step with its SQL opened
+f_live_why = frame(LIVE, 103.6, TMP / "live_why.png")             # Why: per-sentence checks
+f_live_rows = frame(LIVE, 108.8, TMP / "live_rows.png")           # the one journey query above the rows
+f_case5 = frame(LIVE, 283.6, TMP / "case5.png")                    # never charged + the refused foreign order
+f_zq = ZUI / "30_journey_query_in_zetaris.png"
+f_zd = ZUI / "31_three_datasources.png"
+CHAIN, REPLYFIX = (240, 0, 960, 540), (240, 250, 960, 540)
 
-# each line: list of (kind, args, seconds or None = fill the rest of the slot)
+# each line: list of (kind, args, seconds or None = fill the rest of the slot[, opts])
 PLAN = {
     "N01": [("still", (COMIC / "panel_P1.png",), None)],
     "N02": [("still", (COMIC / "panel_P2.png",), 6.5), ("still", (COMIC / "panel_P3.png",), None)],
     "N03": [("clip", (LIVE, 0.6, 5.9), None, {"crop": (240, 60, 960, 540)})],
-    "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 216.05, 218.25), 2.2),
-            ("still", (f_live_result,), None, {"crop": TIMELINE, "zoom": (1.0, 1.08)})],
-    "N05": [("still", (COMIC / "panel_P5.png",), 3.5), ("still", (f_live_result,), 5.0, {"crop": CHAIN}),
-            ("clip", (LIVE, 224.05, 226.25), 2.2), ("still", (f_live_rows,), None, {"crop": ROWS, "zoom": (1.0, 1.05)})],
-    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 228.05, 231.35), None, {"crop": (240, 200, 960, 540)})],
+    "N04": [("still", (COMIC / "panel_P4.png",), 4.0), ("clip", (LIVE, 90.0, 92.2), 2.2, {"crop": (240, 0, 960, 540)}),
+            ("clip", (LIVE, 96.4, 99.8), 3.4, {"crop": (240, 360, 960, 540)}),
+            ("still", (f_live_sql,), None, {"crop": (240, 360, 960, 540), "zoom": (1.0, 1.08)})],
+    "N05": [("still", (COMIC / "panel_P5.png",), 3.5), ("still", (f_live_result,), 4.5, {"crop": CHAIN}),
+            ("clip", (LIVE, 104.9, 106.4), 1.5, {"crop": (240, 0, 960, 540)}),
+            ("still", (f_live_rows,), None, {"crop": (240, 0, 960, 540), "zoom": (1.0, 1.06)})],
+    "N05b": [("still", (f_live_why,), None, {"crop": (240, 200, 960, 540), "zoom": (1.0, 1.1)})],
+    "N06": [("still", (f_live_result,), 6.8, {"crop": REPLYFIX}), ("clip", (LIVE, 111.4, 114.3), None, {"crop": (240, 200, 960, 540)})],
     "N07": [("clip", (OFF, "approve-0.6", "after_fix+0.3"), None, {"crop": (240, 0, 960, 540)})],
-    "N08": [("clip", (CASE5, 409.9, 412.5), None, {"crop": (240, 0, 960, 540)})],
+    "N08": [("clip", (CASE5, 280.9, 283.4), None, {"crop": (240, 0, 960, 540)})],
     "N08b": [("still", (f_case5,), 2.6, {"crop": (240, 0, 960, 540), "zoom": (1.0, 1.12)}),
-             ("still", (f_case5,), None, {"crop": (270, 520, 676, 380), "zoom": (1.0, 1.04)})],
-    "N09": [("still", (ZUI / "01_home.png",), 3.6), ("still", (ZUI / "05_Semantic.png",), 3.4),
-            ("still", (NUI / "02_lanes.png",), 4.0), ("still", (NUI / "01_cockpit.png",), None)],
+             ("still", (f_case5,), None, {"crop": (240, 400, 960, 540), "zoom": (1.0, 1.06)})],
+    "N09": [("still", (f_zd,), 4.2, {"zoom": (1.0, 1.06)}), ("still", (f_zq,), 6.0, {"zoom": (1.0, 1.08)}),
+            ("still", (NUI / "02_lanes.png",), 3.6), ("still", (NUI / "01_cockpit.png",), None)],
     "N10": [("still", (PARTS / "card_measured.png",), None, {"zoom": (1.0, 1.02)})],
     "N11": [("still", (ROOT / "docs/how-it-works.png",), 2.6), ("still", (PARTS / "card_title.png",), None, {"zoom": (1.0, 1.0)})],
 }
-LIVE_LABEL = {"N03", "N04", "N05", "N06", "N08", "N08b"}
+LIVE_LABEL = {"N03", "N04", "N05", "N05b", "N06", "N08", "N08b"}
 
 off_marks = json.loads((D / "take_offline/marks.json").read_text())
 

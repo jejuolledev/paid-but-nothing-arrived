@@ -78,6 +78,9 @@ def evidence(ask: Ask):
     lines = [f"# Evidence bundle — order {r['order_id']} ({r['email']})", "", f"**Finding:** {r['headline']}", "", f"**Root cause:** {r['explanation']}", "", "## Money chain"]
     for l in r["chain"]:
         lines.append(f"- [{l['state'].upper()}] {l['label']} — {l['note']}" + (f"  (refs: {', '.join(l['refs'])})" if l["refs"] else ""))
+    jq = [q for q in r.get("queries", []) if q["tool"] == "order_journey"]
+    if jq:
+        lines += ["", f"## The query ({r.get('backend')})", "```sql", jq[-1]["sql"], "```"]
     lines += ["", "## Verified", *[f"- {v}" for v in r["verified"]], "", "## Not verified", *[f"- {u}" for u in r["unverified"]], "", "## Cited raw rows"]
     cited = {ref for l in r["chain"] for ref in l["refs"]}
     for table, rows in r["rows"].items():
