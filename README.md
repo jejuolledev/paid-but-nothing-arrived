@@ -4,7 +4,7 @@
 
 **In ten seconds:** a small online seller gets *"I paid 24,900 won and nothing arrived."* Paste that message. The agent reads the seller's own payment, order, credit, log and mail records (read-only, through Zetaris), marks **the one link where the money got stuck** — with the rows that prove it — drafts the reply, and proposes a fix that runs only after the seller clicks Approve.
 
-| Watch (2:08) | How it works |
+| Watch (2:31) | How it works |
 |---|---|
 | [![Demo video](docs/demo/thumbnail.png)](https://youtu.be/Pzv--B0HpU8) | ![How it works](docs/how-it-works.png) |
 
