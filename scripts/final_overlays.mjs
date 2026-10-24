@@ -10,7 +10,7 @@ const LINES = {
   N02: 'The proof is in four places: the payment provider, the orders database, the server logs, the mail provider. At one in the morning, that’s four dashboards.',
   N03: 'Paste the message. Just the customer’s email — no order number.',
   N04: 'Nemotron, through Meterless Nightshift, decides where to look. No order under this email. So: who paid at the payment provider? Which order is that payment? Then the full journey. Every lookup is read-only, through one SQL door — Zetaris.',
-  N05: 'A rule-based verifier — not the model — checks the money chain. Paid. Order confirmed. But the credits went to a typo — exmaple dot com — and the mail bounced. Every red link carries the rows that prove it, and the one Zetaris query that fetched them.',
+  N05: 'A rule-based verifier — not the model — checks the money chain. Paid. Order confirmed. But the credits went to a typo — exmaple dot com — and the mail bounced. Every red link carries the rows that prove it, and the one query that fetched them.',
   N05b: 'And the model’s explanation is checked sentence by sentence: every amount and address it states must appear in the rows it cites.',
   N06: 'You get a reply in the customer’s language. It can’t promise refunds — money is a human decision. And a fix: move the credits, once the customer confirms.',
   N07: 'Approve, and the fix runs. The chain turns green, and the fix goes into an audit log.',
@@ -42,8 +42,8 @@ await shot(`<div style="position:absolute;left:26px;top:22px;background:#0b2e1a;
 const card = (inner) => `<div style="width:1920px;height:1080px;background:#0f1115;color:#e8eaf0;padding:200px 150px">${inner}</div>`;
 await shot(card(`<div style="font-size:30px;color:#9aa3b2;letter-spacing:.08em;text-transform:uppercase">Measured</div>
 <div style="font-size:64px;font-weight:800;margin:16px 0 50px">6 cases from our own shop, synthetic data</div>
-<div style="display:flex;gap:40px">${[['6 / 6', 'right order and right broken link'], ['6 / 6', 'explanations pass the citation check'], ['16', 'automated tests, incl. cross-customer and double-approve']].map(([n, t]) => `<div style="flex:1;border:2px solid #2a2f3a;border-radius:18px;padding:34px 36px"><div style="font-size:92px;font-weight:800;color:#7ee2a8">${n}</div><div style="font-size:32px;color:#c3c9d4;margin-top:8px">${t}</div></div>`).join('')}</div>
-<div style="font-size:28px;color:#9aa3b2;margin-top:46px">Final code, Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted, free key). The agent loop named the order itself in 5 of 6; a message quoting another customer’s order was blocked.</div>`), 'card_measured', false);
+<div style="display:flex;gap:40px">${[['6 / 6', 'right order and right broken link'], ['6 / 6', 'explanations pass the citation and per-sentence claim check'], ['19', 'automated tests, incl. cross-customer, claim check and double-approve']].map(([n, t]) => `<div style="flex:1;border:2px solid #2a2f3a;border-radius:18px;padding:34px 36px"><div style="font-size:92px;font-weight:800;color:#7ee2a8">${n}</div><div style="font-size:32px;color:#c3c9d4;margin-top:8px">${t}</div></div>`).join('')}</div>
+<div style="font-size:28px;color:#9aa3b2;margin-top:46px">Final code, Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted, free key); the same SQL run on the synthetic CSVs. The agent loop named the order itself in 5 of 6; a message quoting another customer’s order was refused.</div>`), 'card_measured', false);
 await shot(card(`<div style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
 <div style="font-size:96px;font-weight:800">Paid, but nothing arrived?</div><div style="font-size:52px;color:#7ee2a8;margin-top:18px">Found in one pass.</div>
 <div style="font-size:30px;color:#9aa3b2;margin-top:60px">Zetaris · Meterless Nightshift · NVIDIA Nemotron · built with Cursor</div>

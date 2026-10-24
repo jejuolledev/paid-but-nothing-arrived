@@ -69,9 +69,9 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 # Zetaris: the same query, in Zetaris
 
-![w:900](demo/zetaris_ui/30_journey_query_in_zetaris.png)
+![w:1100](demo/zetaris_ui/30_journey_query_crop.png)
 
-The agent's journey query run in Zetaris's SQL Workspace: order saved under `exmaple.com`, payer `example.com`, mail sent then bounced — three datasources, one statement.
+The agent's journey query in Zetaris's SQL Workspace: three datasources, one statement — order under `exmaple.com`, payer `example.com`, mail sent then bounced.
 
 ---
 
@@ -79,7 +79,7 @@ The agent's journey query run in Zetaris's SQL Workspace: order saved under `exm
 
 - Every model call goes through Nightshift on the Mac: a Nemotron lane (NVIDIA's hosted endpoint in the demo), a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured on the final code through Nightshift → Nemotron (hosted): right order and link 6/6, citation check 6/6, loop named the order 5/6, cross-customer probe blocked; 18 automated tests.
+- Measured on the final code through Nightshift → Nemotron (hosted): right order and link 6/6, citation + claim check 6/6, loop named the order 5/6, cross-customer probe blocked; 19 automated tests.
 
 ---
 

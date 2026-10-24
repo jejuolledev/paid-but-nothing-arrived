@@ -14,7 +14,7 @@ Also: [slides](docs/slides.pdf) · [six-panel comic](docs/comic/comic_strip.png)
 ```bash
 git clone https://github.com/jejuolledev/paid-but-nothing-arrived && cd paid-but-nothing-arrived
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 18 tests pass
+.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 19 tests pass
 .venv/bin/uvicorn app.main:app --port 8765                                  # open http://127.0.0.1:8765
 ```
 No `uv`? `python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt` works the same.
@@ -86,7 +86,7 @@ See `docs/sponsor-tech.md` for the full write-up.
 
 ## Measured
 `docs/measurements.md`, `scripts/llm_smoke.py`, synthetic data, six seeded cases (case 6 is outside the verifier's playbook and only gives the payer's address):
-- **Final code, 2026-10-23 03:34, through Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted endpoint, free trial key):** right order and broken link **6/6**; explanation citation check **6/6**; the model-driven loop itself named the right order **5/6** (case 5 hit the step limit and the plain lookup found it); the model's reply was kept **5/6** (one replaced by the template); a message quoting another customer's order number was **blocked**. 74–218 s per case on the free endpoint (avg 111 s).
+- **Final code, 2026-10-24 21:42, through Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted endpoint, free trial key):** right order and broken link **6/6**; explanations pass the citation check *and* the per-sentence claim check **6/6**; the model-driven loop itself named the right order **5/6** (case 5 hit the step limit and the plain lookup found it); the model's reply was kept **4/6** (two were replaced by the template — e.g. one leaked a masked address); a message quoting another customer's order number was **blocked**. 34–231 s per case on the free endpoint (avg 88 s). This run used the same SQL on the synthetic CSVs; the journey query was run separately on the local Zetaris platform (three datasources, about 6–9 s warm).
 - The verdict never depends on the model. With a model, the loop finds case 6 (payer address only, order under a typo) in four read-only calls; without one, the fallback lookup (payer address → payment provider → order) reaches it too, and the verifier's address-mismatch check decides the verdict.
 - An earlier five-case version without the loop also ran fully on the Mac (Nemotron 3.5 Lightning 30B 4-bit, rapid-mlx): 5/5 and 5/5, about 14 s per case.
 

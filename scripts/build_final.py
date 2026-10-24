@@ -64,7 +64,7 @@ slot["N11"] += 1.5  # title card holds a moment after the last line
 
 f_live_result = frame(LIVE, 91.5, TMP / "live_result.png")        # chain + reply + fix on screen
 f_live_sql = frame(LIVE, 98.8, TMP / "live_sql.png")              # a timeline step with its SQL opened
-f_live_why = frame(LIVE, 103.6, TMP / "live_why.png")             # Why: per-sentence checks
+f_live_why = frame(LIVE, 102.9, TMP / "live_why.png")             # Why: per-sentence checks
 f_live_rows = frame(LIVE, 108.8, TMP / "live_rows.png")           # the one journey query above the rows
 f_case5 = frame(LIVE, 283.6, TMP / "case5.png")                    # never charged + the refused foreign order
 f_zq = ZUI / "30_journey_query_in_zetaris.png"
@@ -88,7 +88,7 @@ PLAN = {
     "N08": [("clip", (CASE5, 280.9, 283.4), None, {"crop": (240, 0, 960, 540)})],
     "N08b": [("still", (f_case5,), 2.6, {"crop": (240, 0, 960, 540), "zoom": (1.0, 1.12)}),
              ("still", (f_case5,), None, {"crop": (240, 400, 960, 540), "zoom": (1.0, 1.06)})],
-    "N09": [("still", (f_zd,), 4.2, {"zoom": (1.0, 1.06)}), ("still", (f_zq,), 6.0, {"zoom": (1.0, 1.08)}),
+    "N09": [("still", (f_zd,), 3.4, {"crop": (550, 776, 1000, 124)}), ("still", (f_zq,), 3.4, {"crop": (560, 150, 840, 180)}), ("still", (f_zq,), 3.6, {"crop": (550, 776, 1340, 96)}),
             ("still", (NUI / "02_lanes.png",), 3.6), ("still", (NUI / "01_cockpit.png",), None)],
     "N10": [("still", (PARTS / "card_measured.png",), None, {"zoom": (1.0, 1.02)})],
     "N11": [("still", (ROOT / "docs/how-it-works.png",), 2.6), ("still", (PARTS / "card_title.png",), None, {"zoom": (1.0, 1.0)})],

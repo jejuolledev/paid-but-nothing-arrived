@@ -15,8 +15,12 @@
   "Which order is that payment? Then the full journey. Every lookup is read-only, through one SQL door — Zetaris."
  ],
  "N05": [
-  "A rule-based verifier — not the model — checks the money chain. Paid. Order confirmed.",
-  "But the credits went to a typo — exmaple dot com — and the mail bounced. Every red link carries the rows that prove it."
+  "A rule-based verifier — not the model — checks the money chain. Paid. Order confirmed. But the credits went to a typo — exmaple dot com — and the mail bounced.",
+  "Every red link carries the rows that prove it, and the one query that fetched them."
+ ],
+ "N05b": [
+  "And the model’s explanation is checked sentence by sentence: every",
+  "amount and address it states must appear in the rows it cites."
  ],
  "N06": [
   "You get a reply in the customer’s language. It can’t promise refunds — money is a human decision.",
@@ -32,7 +36,7 @@
   "And if a message quotes someone else’s order number, that order is never read."
  ],
  "N09": [
-  "Under the hood: the shop’s five record tables are registered in Zetaris and joined in one semantic layer, order journey.",
+  "Under the hood: the shop database, the payment provider’s ledger and the mail provider’s events are three separate sources in Zetaris, joined in one semantic layer and read with a single query.",
   "Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model."
  ],
  "N10": [
