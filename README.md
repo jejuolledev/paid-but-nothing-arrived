@@ -6,7 +6,7 @@
 
 | Watch (2:31) | How it works |
 |---|---|
-| [![Demo video](docs/demo/thumbnail.png)](https://youtu.be/Pzv--B0HpU8) | ![How it works](docs/how-it-works.png) |
+| [![Demo video](docs/demo/thumbnail.png)](https://youtu.be/vERrPWmXxJA) | ![How it works](docs/how-it-works.png) |
 
 Also: [slides](docs/slides.pdf) · [six-panel comic](docs/comic/comic_strip.png) · Korean versions: [how it works](docs/how-it-works_ko.png), [comic](docs/comic/comic_strip_ko.png)
 

@@ -22,7 +22,7 @@ Tested on Zetaris with six cases rebuilt from real bugs in my own shop (all data
 
 ## Video
 ```
-https://youtu.be/Pzv--B0HpU8
+https://youtu.be/vERrPWmXxJA
 ```
 
 ## GitHub repository
