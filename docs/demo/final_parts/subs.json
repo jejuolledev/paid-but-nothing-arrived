@@ -12,7 +12,7 @@
  ],
  "N04": [
   "Nemotron, through Meterless Nightshift, decides where to look. No order under this email. So: who paid at the payment provider?",
-  "Which order is that payment? Then the full journey. Every lookup is read-only, through one SQL door — Zetaris."
+  "Which order does that payment belong to? Then the full journey. Every lookup is read-only, through one SQL door — Zetaris."
  ],
  "N05": [
   "A rule-based verifier — not the model — checks the money chain. Paid. Order confirmed. But the credits went to a typo — exmaple dot com — and the mail bounced.",
@@ -20,7 +20,7 @@
  ],
  "N05b": [
   "And the model’s explanation is checked sentence by sentence: every",
-  "amount and address it states must appear in the rows it cites."
+  "amount, address and status it states must match the rows it cites."
  ],
  "N06": [
   "You get a reply in the customer’s language. It can’t promise refunds — money is a human decision.",
@@ -40,8 +40,8 @@
   "Every model call goes through Nightshift, with a receipt for which model ran. Addresses are masked and card digits removed before any row reaches the model."
  ],
  "N10": [
-  "Six cases, rebuilt from real bugs in our own shop with synthetic",
-  "data: six out of six right, every explanation cited."
+  "Six cases, rebuilt from real bugs in our own shop with synthetic data: the right order and broken link, six out of six, on every run.",
+  "And thirty out of thirty deliberately wrong sentences were caught."
  ],
  "N11": [
   "Paid, but nothing arrived? Found in one pass."
