@@ -21,6 +21,10 @@ await p.fill('#msg', 'Hi, I paid 24,900 won yesterday but my credits never came.
 await p.waitForTimeout(1200); mark('typed');
 await p.evaluate(() => { document.querySelector('#status').textContent = ''; }); await p.click('#go'); mark('investigate_click');
 await waitResult(); mark('result6');
+// the free hosted model sometimes aborts a long request; in that case run the same message again (up to 2 more times)
+for (let k = 0; k < 2 && /model call failed/.test(await p.$eval('#status', e => e.textContent)); k++) {
+  await p.evaluate(() => { document.querySelector('#status').textContent = ''; }); await p.click('#go'); await waitResult(); mark('result6_retry' + (k + 1));
+}
 await p.waitForTimeout(2500);
 // timeline into view
 const tl = await p.$('text=/How the agent found it|에이전트가 찾은 과정/'); if (tl) { await tl.scrollIntoViewIfNeeded(); await p.waitForTimeout(3500); mark('timeline'); }

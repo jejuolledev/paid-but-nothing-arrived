@@ -167,7 +167,9 @@ def _claims_ok(text: str, ref_rows: dict[str, dict]) -> tuple[bool, list[dict]]:
                 continue
             m = re.search(pat, low)
             facts.append(m.group(0))
-            if not holds(rows):
+            # "twice" is a claim about the explanation as a whole: count grants cited anywhere in it
+            scope = [dict(ref_rows[r], ref=r) for r in cited_all if r in ref_rows] if name == "twice" else rows
+            if not holds(scope):
                 missing.append(m.group(0))
         if missing:
             ok = False
@@ -302,6 +304,7 @@ def investigate(message: str, email: str = "", order_id: str = "", backend=None,
             mark("llm_explain", f"{model} citations_ok={ok}")
         except Exception as e:  # keep the demo honest: show that the model step failed
             mark("llm_explain", f"failed: {type(e).__name__}: {e}"[:200])
+            print(f"[investigator] explain call failed: {type(e).__name__}: {str(e)[:400]}", flush=True)
             # nothing listening at the configured address (e.g. Nightshift not running) is not a model failure
             llm_used = "unreachable" if "Connection" in type(e).__name__ else "failed"
     if texts is None:
