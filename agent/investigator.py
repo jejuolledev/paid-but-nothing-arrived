@@ -235,6 +235,8 @@ def _reply_ok(reply: str, v) -> bool:
     if v.broken == "account_mismatch" and (not re.search(r"confirm|확인해", reply, re.I)
                                            or re.search(r"(are|am|we're|i'm) (now )?moving|right away|already moved|옮기고 있|옮겼", reply, re.I)):
         return False  # credits move only after the customer confirms and the seller approves
+    if re.search(r"\*\*\*@|\bCUSTOMER\b", reply):
+        return False  # masked placeholders are for the model, never for the customer
     if re.search(r"where you('d| would) like|which (email|address)|(send|give|tell) (us|me) (the|your|an?) (new |other |different )?(email|address)|another (email|address)|new (email|address)|원하시는 (주소|이메일)|다른 (주소|이메일)을 알려", reply, re.I):
         return False  # the fix only moves credits to the payer's own address; never invite an arbitrary one
     key = v.broken if v.broken in REPLY_MUST else None

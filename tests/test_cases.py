@@ -193,3 +193,10 @@ def test_reply_language_follows_the_page_and_reset_restores_the_bug(monkeypatch)
     monkeypatch.setitem(sql_backend._CACHE, "backend", old)
     from app.main import api_reset
     assert api_reset().status_code == 200 and sql_backend._CACHE["backend"] is not old  # fresh data, bugs back
+
+
+def test_reply_with_masked_placeholders_is_replaced():
+    from types import SimpleNamespace
+    from agent.investigator import _reply_ok
+    v = SimpleNamespace(broken="account_mismatch", headline="Paid, but the credits went to a different account.")
+    assert not _reply_ok("The credits went to l***@exmaple.com. Could you confirm this is the email address you used for the payment?", v)

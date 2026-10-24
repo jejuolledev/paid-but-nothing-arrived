@@ -14,7 +14,7 @@ Also: [slides](docs/slides.pdf) · [six-panel comic](docs/comic/comic_strip.png)
 ```bash
 git clone https://github.com/jejuolledev/paid-but-nothing-arrived && cd paid-but-nothing-arrived
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 16 tests pass
+.venv/bin/python data/gen_synthetic.py && .venv/bin/python -m pytest -q     # 18 tests pass
 .venv/bin/uvicorn app.main:app --port 8765                                  # open http://127.0.0.1:8765
 ```
 No `uv`? `python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt` works the same.
@@ -44,7 +44,7 @@ customer message ──▶ find_orders ──▶ order_journey (one SQL door) �
                                      server_logs · mail_events        5-link verifier    Nightshift on the Mac
                                      via Zetaris (order_journey)      (decides)          (explains, cited)
 ```
-- `agent/sql_backend.py` — the only place that talks to data. Zetaris (JDBC or REST) in production; DuckDB over the synthetic CSVs for tests, same table names, same SQL.
+- `agent/sql_backend.py` — the only place that talks to data. Zetaris over JDBC (tested against the local Zetaris platform; a REST client is sketched but not verified); DuckDB over the synthetic CSVs for tests, same table names, same SQL.
 - `agent/tools.py` — the read-only tools (`find_orders`, `find_payments`, `order_for_payment`, `order_journey`, `related_orders`). Every row carries a `ref` = `table:key`.
 - `agent/agent_loop.py` — the investigation loop: Nemotron picks the next tool; the tools only follow the sender's own trail.
 - `agent/actions.py` — human-approved fixes with an audit log (offline demo; Zetaris stays read-only).
@@ -97,7 +97,7 @@ None of our product code. Open-source libraries only (`requirements.txt`). Every
 - Seller-side tool: it reads only the seller's own merchant records (PSP ledger, orders, grants, server logs, mail events). It never touches a customer's card issuer or bank. Run it on the seller's machine (`--host 127.0.0.1`, the default); the API has no login and is not meant to be exposed.
 - Only well-formed ids (`ord_0000`, an email address) reach SQL; anything else is refused.
 - Data path in the demo: masked rows go from the app to Nightshift on the Mac, and Nightshift sends them to NVIDIA's hosted Nemotron endpoint. Customer names or phone numbers written in a message are not masked. To keep everything on the machine, set Nightshift to local-only or point the app at a local server (rapid-mlx).
-- A sender can only reach their own records: the email in the message decides whose orders the agent may read, and an order number that belongs to someone else is ignored and shown as such.
+- The address in the message decides whose records the agent may read: an order number that belongs to a different address is ignored and the page says so, and a message with no address is flagged. The seller still checks that the address really is the sender's (the tool reads pasted text, not the mail headers).
 - The model never decides: the verdict and the fix come from the verifier; the model writes the explanation (citation-checked) and the reply draft, which is replaced by a template if it promises money or misstates the verdict.
 
 ## Limitations

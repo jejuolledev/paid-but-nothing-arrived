@@ -131,6 +131,7 @@ const I18N={
     citationFail:'Citation check: failed → verifier text used',
     citationSkip:'Citation check: model step skipped (no model reachable)',
     resetDemo:'Reset the demo data (puts the bugs back so you can try again)',
+    knownPattern:'This root cause is the known pattern for this kind of break (from our incident notes); the cited rows show the symptoms.',
     resetDone:'Demo data reset. Click a case to start again.',
     evidenceBtn:'Dispute evidence bundle',
     ms:'ms',
@@ -194,6 +195,7 @@ const I18N={
     citationFail:'인용 검사: 실패 → 검증기 문구 사용',
     citationSkip:'인용 검사: 모델 단계 생략(연결된 모델 없음)',
     resetDemo:'데모 데이터 되돌리기(오류를 다시 넣어 처음부터 해 볼 수 있음)',
+    knownPattern:'이 원인 설명은 이런 끊김의 알려진 유형(저희 사고 기록)입니다. 근거 행은 그 증상을 보여 줍니다.',
     resetDone:'데모 데이터를 되돌렸습니다. 사례를 눌러 다시 시작하세요.',
     evidenceBtn:'분쟁용 근거 묶음',
     ms:'ms',
@@ -486,7 +488,7 @@ function render(r, opts){
       <p id="approve-msg" class="hint" style="margin:8px 0 0" hidden></p></div>
   </div>
   ${renderSteps(r.steps)}
-  <div class="card"><h2>${esc(i.why)}</h2><p>${linkifyExplain(r.explanation)}</p>
+  <div class="card"><h2>${esc(i.why)}</h2><p>${linkifyExplain(r.explanation)}</p>${(!r.citation_check||!r.citation_check.checked||r.citation_check.replaced_with_verifier_text)?`<p class="hint">${esc(i.knownPattern)}</p>`:''}
     <p class="mut" style="font-size:12px">${esc(citeNote)}</p></div>
   <div class="card two"><div><h2>${esc(i.verified)}</h2><ul>${r.verified.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></div>
     <div><h2>${esc(i.unverified)}</h2><ul>${r.unverified.map(v=>`<li>${esc(v)}</li>`).join('')||`<li class="mut">—</li>`}</ul></div></div>

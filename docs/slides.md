@@ -71,7 +71,7 @@ Python 3.12 · FastAPI · Zetaris (Lightning JDBC, USL) · Meterless Nightshift 
 
 - Every model call goes through Nightshift on the Mac: a Nemotron lane (NVIDIA's hosted endpoint in the demo), a receipt for every answer. Addresses are masked and card digits removed before the model sees rows.
 - Nemotron explains and drafts; it never decides the verdict.
-- Measured on the final code through Nightshift → Nemotron (hosted): right order and link 6/6, citation check 6/6, loop named the order 5/6, cross-customer probe blocked; 16 automated tests.
+- Measured on the final code through Nightshift → Nemotron (hosted): right order and link 6/6, citation check 6/6, loop named the order 5/6, cross-customer probe blocked; 18 automated tests.
 
 ---
 
