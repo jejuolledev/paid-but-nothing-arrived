@@ -54,7 +54,7 @@ def _client():
     from openai import OpenAI
     # Nightshift keeps a policy per calling app; this name is the row the operator sees and binds.
     headers = {"meterless-app": "paid-but-nothing-arrived"} if os.getenv("NIGHTSHIFT_BASE_URL") else None
-    return OpenAI(base_url=base, api_key=key or "local", default_headers=headers, timeout=180), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
+    return OpenAI(base_url=base, api_key=key or "local", default_headers=headers, timeout=180, max_retries=0), os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning:free")
 
 
 REF_RE = re.compile(r"(?:payments|orders|grants|server_logs|mail_events):[A-Za-z0-9_./@:+-]+")
@@ -96,11 +96,12 @@ def _order_belongs(tools, order_id: str, email: str) -> bool:
     return any(p["payment_id"] == o[0].get("payment_id") for p in tools.find_payments(email))
 
 
-def investigate(message: str, email: str = "", order_id: str = "", backend=None, use_model: bool = True) -> dict:
+def investigate(message: str, email: str = "", order_id: str = "", backend=None, use_model: bool = True, lang: str = "") -> dict:
     from .sql_backend import get_backend
     db = backend or get_backend()
     tools, trace, t0 = Tools(db), [], time.time()
-    lang = "ko" if re.search(r"[가-힣]", message or "") else "en"
+    # reply language: what the page asks for (the seller's language toggle), else the language of the message
+    lang = lang if lang in ("en", "ko") else ("ko" if re.search(r"[가-힣]", message or "") else "en")
 
     def mark(step, detail):
         trace.append(Trace(step, detail, int((time.time() - t0) * 1000)))
@@ -246,7 +247,7 @@ def _template_reply(v, lang: str = "en") -> str:
     if lang == "ko":
         return _template_reply_ko(v)
     if v.broken is None and "never charged" in v.headline.lower():
-        return "Thank you for writing. I checked our payment provider: no charge was made on your card for this order, so nothing is missing and nothing will be billed. Here is a fresh checkout link whenever you are ready."
+        return "Thank you for writing. I checked our payment provider: no charge was made on your card for this order, so nothing is missing and nothing will be billed. I can send you a fresh checkout link whenever you are ready."
     if v.broken == "order_created":
         return "Thank you for your patience. I can confirm your payment went through on our provider's side. Our system did not complete your order after that — that is our fault, not yours. I will release your credits as soon as this is fixed on our side, and you will get a confirmation email."
     if v.broken == "credit_granted":
@@ -261,7 +262,7 @@ def _template_reply(v, lang: str = "en") -> str:
 def _template_reply_ko(v) -> str:
     """Same facts as the English templates; polite 존댓말; no internal refs."""
     if v.broken is None and "never charged" in v.headline.lower():
-        return "문의해 주셔서 감사합니다. 결제 대행사를 확인한 결과 이번 주문에 대해 카드에 청구된 내역이 없습니다. 빠진 이용권도 없고 추가 청구도 되지 않습니다. 준비되시면 새 결제 링크로 다시 진행해 주세요."
+        return "문의해 주셔서 감사합니다. 결제 대행사를 확인한 결과 이번 주문에 대해 카드에 청구된 내역이 없습니다. 빠진 이용권도 없고 추가 청구도 되지 않습니다. 원하시면 새 결제 링크를 보내 드리겠습니다."
     if v.broken == "order_created":
         return "기다려 주셔서 감사합니다. 결제 대행사 기준으로는 결제가 정상 완료된 것을 확인했습니다. 이후 주문을 마무리하지 못한 것은 저희 쪽 문제입니다. 저희 쪽에서 바로잡는 대로 이용권을 지급하고 확인 메일을 보내 드리겠습니다."
     if v.broken == "credit_granted":

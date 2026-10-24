@@ -129,7 +129,9 @@ const I18N={
     trace:'Trace',
     citationOk:'Citation check: passed',
     citationFail:'Citation check: failed → verifier text used',
-    citationSkip:'Citation check: model step skipped (no endpoint)',
+    citationSkip:'Citation check: model step skipped (no model reachable)',
+    resetDemo:'Reset the demo data (puts the bugs back so you can try again)',
+    resetDone:'Demo data reset. Click a case to start again.',
     evidenceBtn:'Dispute evidence bundle',
     ms:'ms',
     answeredBy:m=>'Answered by: '+m,
@@ -190,7 +192,9 @@ const I18N={
     trace:'추적',
     citationOk:'인용 검사: 통과',
     citationFail:'인용 검사: 실패 → 검증기 문구 사용',
-    citationSkip:'인용 검사: 모델 단계 생략(엔드포인트 없음)',
+    citationSkip:'인용 검사: 모델 단계 생략(연결된 모델 없음)',
+    resetDemo:'데모 데이터 되돌리기(오류를 다시 넣어 처음부터 해 볼 수 있음)',
+    resetDone:'데모 데이터를 되돌렸습니다. 사례를 눌러 다시 시작하세요.',
     evidenceBtn:'분쟁용 근거 묶음',
     ms:'ms',
     answeredBy:m=>'답변: '+m,
@@ -226,12 +230,12 @@ const I18N={
 };
 
 const EXAMPLES={
-  1:{label:'I paid but my credits never came — ord_0901',send:'I paid but my credits never came — ord_0901'},
-  2:{label:'I paid but the order never confirmed — ord_0902',send:'I paid but the order never confirmed — ord_0902'},
-  3:{label:'I was granted the same credits twice — ord_0903',send:'I was granted the same credits twice — ord_0903'},
-  4:{label:'Credits arrived but I never got an email — ord_0904',send:'Credits arrived but I never got an email — ord_0904'},
-  5:{label:'I thought I paid but nothing showed up — ord_0905',send:'I thought I paid but nothing showed up — ord_0905'},
-  6:{label:'I paid but nothing arrived — liam.patel906@example.com',send:'liam.patel906@example.com'},
+  1:{label:'I paid but my credits never came — ord_0901',send:'I paid but my credits never came. Order ord_0901. hana.lee901@example.com'},
+  2:{label:'I paid but the order never confirmed — ord_0902',send:'I paid but the order never confirmed. Order ord_0902. jun.park902@example.com'},
+  3:{label:'I was granted the same credits twice — ord_0903',send:'I was granted the same credits twice. Order ord_0903. sora.kim903@example.com'},
+  4:{label:'Credits arrived but I never got an email — ord_0904',send:'Credits arrived but I never got an email. Order ord_0904. noah.chen904@example.com'},
+  5:{label:'I thought I paid but nothing showed up — ord_0905',send:'I thought I paid but nothing showed up. Order ord_0905. emma.song905@example.com'},
+  6:{label:'I paid but nothing arrived — liam.patel906@example.com',send:'Hi, I paid 24,900 won yesterday but my credits never came. liam.patel906@example.com'},
 };
 
 let lang='en', lastResult=null, lastFix=null, casesCache=[];
@@ -381,7 +385,7 @@ async function run(){
   $('#go').disabled=true;
   lastFix=null;
   try{
-    const res=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+    const res=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,lang})});
     if(!res.ok){
       lastResult=null;
       hideHowAfterResult();
@@ -445,7 +449,7 @@ function renderFixCard(){
     <div class="fix-chains">
       <div class="panel before"><h3>${esc(i.before)}</h3><div class="mini chain">${renderChain(f.before,false)}</div></div>
       <div class="panel after"><h3>${esc(i.after)}</h3><div class="mini chain">${renderChain(f.after,false)}</div></div>
-    </div></div>`;
+    </div><p class="fix-meta"><a href="#" id="reset-demo">${esc(i.resetDemo)}</a></p></div>`;
 }
 
 function render(r, opts){
@@ -506,6 +510,11 @@ function render(r, opts){
   document.querySelectorAll('a.cite').forEach(a=>{
     a.onclick=e=>{e.preventDefault();goToRef(a.dataset.ref);};
   });
+  const rl=$('#reset-demo');
+  if(rl)rl.onclick=async e=>{e.preventDefault();
+    const res=await fetch('/api/reset',{method:'POST'});
+    lastFix=null;lastResult=null;$('#out').innerHTML='';
+    $('#status').textContent=res.ok?i.resetDone:await res.text();};
   if(scroll)$('#out').scrollIntoView({behavior:'smooth',block:'start'});
 }
 

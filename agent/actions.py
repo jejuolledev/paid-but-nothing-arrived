@@ -86,6 +86,7 @@ def _approve(order_id: str, approved_by: str, backend, customer_confirmed: bool)
     audit = db.query(f"SELECT * FROM actions WHERE action_id = '{action_id}'")[0]
     # re-check with the verifier only: the chain is deterministic, and the seller should not wait on a model
     after = investigate(f"order {order_id}", order_id=order_id, backend=db, use_model=False)
+    after["sender_unverified"] = False  # the seller is re-checking an order already tied to its sender
     return {"applied": applied, "audit": audit, "after": after}
 
 

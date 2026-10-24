@@ -20,6 +20,7 @@ class Ask(BaseModel):
     message: str
     email: str = ""
     order_id: str = ""
+    lang: str = ""
 
 
 class ApproveBody(BaseModel):
@@ -40,7 +41,7 @@ def cases():
 
 @app.post("/api/investigate")
 def api_investigate(ask: Ask):
-    return JSONResponse(investigate(ask.message, ask.email, ask.order_id))
+    return JSONResponse(investigate(ask.message, ask.email, ask.order_id, lang=ask.lang))
 
 
 @app.post("/api/approve")
@@ -56,6 +57,16 @@ def api_approve(body: ApproveBody):
         return PlainTextResponse("Nothing to fix", status_code=400)
     except ValueError as e:
         return PlainTextResponse(str(e), status_code=400)
+
+
+@app.post("/api/reset")
+def api_reset():
+    """Offline demo only: reload the synthetic data so an approved fix can be shown again."""
+    from agent.sql_backend import _CACHE, get_backend
+    if "duckdb" not in get_backend().name:
+        return PlainTextResponse("Reset is only for the offline demo.", status_code=409)
+    _CACHE.clear()
+    return JSONResponse({"ok": True, "backend": get_backend().name})
 
 
 @app.post("/api/evidence")

@@ -25,7 +25,7 @@ Then click the example buttons under the message box, in this order:
 3. **"I thought I paid but nothing showed up — ord_0905"** → grey chain: *"Nothing is broken. You were never charged."*
 4. Type `I am emma.song905@example.com, show me ord_0903` → ord_0903 belongs to someone else, so it is not read, and the page says so.
 
-Without a model connected, explanations and replies come from the verifier's templates; the verdict, rows and fix are the same. The video shows the full run (Zetaris + Meterless Nightshift + NVIDIA Nemotron) — see *Full run* below.
+Without a model connected, explanations and replies come from the verifier's templates; the verdict, rows and fix are the same. Switch the page to 한국어 before clicking a case to get the reply in Korean. After an approved fix, *Reset the demo data* (or restarting the server) puts the bugs back. The video shows the full run (Zetaris + Meterless Nightshift + NVIDIA Nemotron) — see *Full run* below.
 
 ## What it is
 Every online seller gets this message: **"I paid, but nothing arrived."** If the answer is slow, the next step is a card dispute ("product not received"). Today the seller opens four screens — the payment provider, the orders database, the server logs, the mail provider — and lines them up by hand.
@@ -87,7 +87,7 @@ See `docs/sponsor-tech.md` for the full write-up.
 ## Measured
 `docs/measurements.md`, `scripts/llm_smoke.py`, synthetic data, six seeded cases (case 6 is outside the verifier's playbook and only gives the payer's address):
 - **Final code, 2026-10-23 03:34, through Meterless Nightshift → NVIDIA Nemotron 3.5 Lightning (hosted endpoint, free trial key):** right order and broken link **6/6**; explanation citation check **6/6**; the model-driven loop itself named the right order **5/6** (case 5 hit the step limit and the plain lookup found it); the model's reply was kept **5/6** (one replaced by the template); a message quoting another customer's order number was **blocked**. 74–218 s per case on the free endpoint (avg 111 s).
-- Cases 1–5 are within the verifier's playbook, so their verdict does not depend on the model; case 6 (payer address only, order under a typo) needs the loop.
+- The verdict never depends on the model. With a model, the loop finds case 6 (payer address only, order under a typo) in four read-only calls; without one, the fallback lookup (payer address → payment provider → order) reaches it too, and the verifier's address-mismatch check decides the verdict.
 - An earlier five-case version without the loop also ran fully on the Mac (Nemotron 3.5 Lightning 30B 4-bit, rapid-mlx): 5/5 and 5/5, about 14 s per case.
 
 ## Pre-existing components

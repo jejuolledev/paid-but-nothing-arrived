@@ -182,3 +182,14 @@ def test_reply_never_invites_another_address():
     from agent.investigator import _reply_ok
     v = SimpleNamespace(broken="account_mismatch", headline="Paid, but the credits went to a different account.")
     assert not _reply_ok("Your payment went through to another address. Please confirm and reply with the email address where you would like the credits sent.", v)
+
+
+def test_reply_language_follows_the_page_and_reset_restores_the_bug(monkeypatch):
+    monkeypatch.setattr("agent.investigator._client", lambda: (None, None))
+    r = investigate("I paid but nothing arrived. Order ord_0904. noah.chen904@example.com", lang="ko")
+    assert r["lang"] == "ko" and re.search(r"[가-힣]", r["customer_reply"])
+    from agent import sql_backend
+    old = DuckDBBackend()
+    monkeypatch.setitem(sql_backend._CACHE, "backend", old)
+    from app.main import api_reset
+    assert api_reset().status_code == 200 and sql_backend._CACHE["backend"] is not old  # fresh data, bugs back
